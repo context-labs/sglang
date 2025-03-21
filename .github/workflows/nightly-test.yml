@@ -32,3 +32,9 @@ jobs:
         run: |
           cd test/srt
           python3 run_suite.py --suite nightly --timeout-per-file 3600
+
+      - name: Feature Compatibility Regression Test
+        timeout-minutes: 120
+        run: |
+          cd test/srt
+          python3 run_suite.py --suite feature_compatibility_regression_test --timeout-per-file 3600
