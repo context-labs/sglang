@@ -15,13 +15,13 @@ from sglang.test.test_utils import (
 )
 
 
-def setup_class(cls, tool_call_parser: str, grammar_backend: str, tp: int):
-    cls.model = DEFAULT_SMALL_MODEL_NAME_FOR_TEST
+def setup_class(cls, model : str, tool_call_parser: str, grammar_backend: str, tp: int):
+    cls.model = model
     cls.tool_call_parser = tool_call_parser
+    cls.grammar_backend = grammar_backend
     cls.tp = tp
     cls.base_url = DEFAULT_URL_FOR_TEST
     cls.api_key = "sk-123456"
-    cls.grammar_backend = grammar_backend
 
     # Start the local OpenAI Server
     cls.process = popen_launch_server(
@@ -45,7 +45,7 @@ def setup_class(cls, tool_call_parser: str, grammar_backend: str, tp: int):
 class OpenAIServerFunctionCallingBase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, tool_call_parser="llama3", grammar_backend="outlines", tp=1)
+        setup_class(cls, model=DEFAULT_SMALL_MODEL_NAME_FOR_TEST, tool_call_parser="llama3", grammar_backend="outlines", tp=1)
 
     @classmethod
     def tearDownClass(cls):
@@ -267,32 +267,41 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
 class MetaLlama_3_1_8BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, tool_call_parser="llama3", grammar_backend="outlines", tp=1)
+        setup_class(cls, model="meta-llama/Llama-3.1-8B-Instruct", tool_call_parser="llama3", grammar_backend="outlines", tp=1)
 
+
+@unittest.skip("Tool call parsing is broken for Llama 3.2 models")
+class MetaLlama_3_2_1BInstruct(OpenAIServerFunctionCallingBase):
+    @classmethod
+    def setUpClass(cls):
+        setup_class(cls, model="meta-llama/Llama-3.2-1B-Instruct", tool_call_parser="llama3", grammar_backend="outlines", tp=1)
 
 class MetaLlama_3_1_70BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, tool_call_parser="llama3", grammar_backend="outlines", tp=2)
-
+        setup_class(cls, model="meta-llama/Llama-3.1-70B-Instruct", tool_call_parser="llama3", grammar_backend="outlines", tp=2)
 
 class MetaLlama_3_2_11BVisionInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, tool_call_parser="llama3", grammar_backend="outlines", tp=1)
+        setup_class(cls, model="meta-llama/Llama-3.2-11B-Vision-Instruct", tool_call_parser="llama3", grammar_backend="outlines", tp=1)
 
 
 class MetaLlama_3_3_70BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, tool_call_parser="llama3", grammar_backend="outlines", tp=2)
+        setup_class(cls, model="meta-llama/Llama-3.3-70B-Instruct", tool_call_parser="llama3", grammar_backend="outlines", tp=2)
 
 
 class MistralNemo12BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, tool_call_parser="mistral", grammar_backend="outlines", tp=1)
+        setup_class(cls, model="nvidia/Mistral-NeMo-12B-Instruct", tool_call_parser="mistral", grammar_backend="outlines", tp=1)
 
+class Qwen_2_5_7BInstruct(OpenAIServerFunctionCallingBase):
+    @classmethod
+    def setUpClass(cls):
+        setup_class(cls, model="Qwen/Qwen2.5-7B-Instruct", tool_call_parser="qwen25", grammar_backend="outlines", tp=1)
 
 if __name__ == "__main__":
     unittest.main()
