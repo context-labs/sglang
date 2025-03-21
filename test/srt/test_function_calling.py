@@ -1,7 +1,6 @@
 import json
 import time
 import unittest
-from typing import Optional
 
 import openai
 
@@ -15,13 +14,11 @@ from sglang.test.test_utils import (
 )
 
 
-class OpenAIServerFunctionCallingBase(unittest.TestCase):
+class TestOpenAIServerFunctionCalling(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Replace with the model name needed for testing; if not required, reuse DEFAULT_SMALL_MODEL_NAME_FOR_TEST
         cls.model = DEFAULT_SMALL_MODEL_NAME_FOR_TEST
-        cls.tool_call_parser = "llama3"
-        cls.tp = 1
         cls.base_url = DEFAULT_URL_FOR_TEST
         cls.api_key = "sk-123456"
 
@@ -34,9 +31,7 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
             other_args=[
                 # If your server needs extra parameters to test function calling, please add them here.
                 "--tool-call-parser",
-                cls.tool_call_parser,
-                "--tp",
-                str(cls.tp),
+                "llama3",
             ],
         )
         cls.base_url += "/v1"
@@ -46,14 +41,36 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
     def tearDownClass(cls):
         kill_process_tree(cls.process.pid)
 
-    def test_function_calling_format_with_no_tool_choice_specified(self):
+    def test_function_calling_format(self):
         """
         Test: Whether the function call format returned by the AI is correct.
         When returning a tool call, message.content should be None, and tool_calls should be a list.
         """
         client = openai.Client(api_key=self.api_key, base_url=self.base_url)
 
-        tools = [self.get_add_tool()]
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "add",
+                    "description": "Compute the sum of two numbers",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "a": {
+                                "type": "int",
+                                "description": "A number",
+                            },
+                            "b": {
+                                "type": "int",
+                                "description": "A number",
+                            },
+                        },
+                        "required": ["a", "b"],
+                    },
+                },
+            }
+        ]
 
         messages = [{"role": "user", "content": "Compute (3+5)"}]
         response = client.chat.completions.create(
@@ -65,89 +82,19 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
             tools=tools,
         )
 
-        self.assert_tool_call_format(
-            response,
-            expected_function_name="add",
-            expected_function_arguments=["a", "b"],
+        content = response.choices[0].message.content
+        tool_calls = response.choices[0].message.tool_calls
+
+        assert content is None, (
+            "When function call is successful, message.content should be None, "
+            f"but got: {content}"
         )
+        assert (
+            isinstance(tool_calls, list) and len(tool_calls) > 0
+        ), "tool_calls should be a non-empty list"
 
-    def test_function_calling_named_tool_choice(self):
-        """
-        Test: Whether the function call format returned by the AI is correct when using named function tool choice.
-        When returning a tool call, message.content should be None, and tool_calls should be a list.
-        """
-        client = openai.Client(api_key=self.api_key, base_url=self.base_url)
-
-        tools = [self.get_add_tool()]
-
-        messages = [{"role": "user", "content": "Compute (3+5)"}]
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.8,
-            top_p=0.8,
-            stream=False,
-            tools=tools,
-            tool_choice={"type": "function", "function": {"name": "add"}},
-        )
-
-        self.assert_tool_call_format(
-            response,
-            expected_function_name="add",
-            expected_function_arguments=["a", "b"],
-        )
-
-    def test_function_calling_required_tool_choice(self):
-        """
-        Test: Whether the function call format returned by the AI is correct when using required function tool choice.
-        When returning a tool call, message.content should be None, and tool_calls should be a list.
-        """
-        client = openai.Client(api_key=self.api_key, base_url=self.base_url)
-
-        tools = [self.get_add_tool()]
-
-        messages = [{"role": "user", "content": "Compute (3+5)"}]
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.8,
-            top_p=0.8,
-            stream=False,
-            tools=tools,
-            tool_choice={"type": "required"},
-        )
-
-        self.assert_tool_call_format(
-            response,
-            expected_function_name="add",
-            expected_function_arguments=["a", "b"],
-        )
-
-    def test_function_calling_auto_tool_choice(self):
-        """
-        Test: Whether the function call format returned by the AI is correct when using auto function tool choice.
-        When returning a tool call, message.content should be None, and tool_calls should be a list.
-        """
-        client = openai.Client(api_key=self.api_key, base_url=self.base_url)
-
-        tools = [self.get_add_tool()]
-
-        messages = [{"role": "user", "content": "Compute (3+5)"}]
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.8,
-            top_p=0.8,
-            stream=False,
-            tools=tools,
-            tool_choice={"type": "auto"},
-        )
-
-        self.assert_tool_call_format(
-            response,
-            expected_function_name="add",
-            expected_function_arguments=["a", "b"],
-        )
+        function_name = tool_calls[0].function.name
+        assert function_name == "add", "Function name should be 'add'"
 
     def test_function_calling_streaming_simple(self):
         """
@@ -157,7 +104,30 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
         """
         client = openai.Client(api_key=self.api_key, base_url=self.base_url)
 
-        tools = [self.get_weather_tool()]
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_current_weather",
+                    "description": "Get the current weather in a given location",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "city": {
+                                "type": "string",
+                                "description": "The city to find the weather for",
+                            },
+                            "unit": {
+                                "type": "string",
+                                "description": "Weather unit (celsius or fahrenheit)",
+                                "enum": ["celsius", "fahrenheit"],
+                            },
+                        },
+                        "required": ["city", "unit"],
+                    },
+                },
+            }
+        ]
 
         messages = [{"role": "user", "content": "What is the temperature in Paris?"}]
 
@@ -201,7 +171,29 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
         """
         client = openai.Client(api_key=self.api_key, base_url=self.base_url)
 
-        tools = [self.get_add_tool()]
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "add",
+                    "description": "Compute the sum of two integers",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "a": {
+                                "type": "int",
+                                "description": "First integer",
+                            },
+                            "b": {
+                                "type": "int",
+                                "description": "Second integer",
+                            },
+                        },
+                        "required": ["a", "b"],
+                    },
+                },
+            }
+        ]
 
         messages = [
             {"role": "user", "content": "Please sum 5 and 7, just call the function."}
@@ -251,73 +243,6 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
             "Parameter a should be 5",
         )
         self.assertEqual(args_obj["b"], 7, "Parameter b should be 7")
-
-    def assert_tool_call_format(
-        self, response, expected_function_name: Optional[str] = None
-    ):
-        content = response.choices[0].message.content
-        tool_calls = response.choices[0].message.tool_calls
-
-        assert content is None, (
-            "When function call is successful, message.content should be None, "
-            f"but got: {content}"
-        )
-        assert (
-            isinstance(tool_calls, list) and len(tool_calls) > 0
-        ), "tool_calls should be a non-empty list"
-
-        function_name = tool_calls[0].function.name
-        if expected_function_name is not None:
-            assert (
-                function_name == expected_function_name
-            ), f"Function name should be '{expected_function_name}'"
-
-    def get_add_tool(self):
-        return {
-            "type": "function",
-            "function": {
-                "name": "add",
-                "description": "Compute the sum of two numbers",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "a": {
-                            "type": "int",
-                            "description": "A number",
-                        },
-                        "b": {
-                            "type": "int",
-                            "description": "A number",
-                        },
-                    },
-                    "required": ["a", "b"],
-                },
-            },
-        }
-
-    def get_weather_tool(self):
-        return {
-            "type": "function",
-            "function": {
-                "name": "get_current_weather",
-                "description": "Get the current weather in a given location",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "city": {
-                            "type": "string",
-                            "description": "The city to find the weather for",
-                        },
-                        "unit": {
-                            "type": "string",
-                            "description": "Weather unit (celsius or fahrenheit)",
-                            "enum": ["celsius", "fahrenheit"],
-                        },
-                        "required": ["city", "unit"],
-                    },
-                },
-            },
-        }
 
 
 if __name__ == "__main__":
