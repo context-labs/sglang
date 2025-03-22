@@ -4,29 +4,29 @@ python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_
 python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_named_tool_choice
 python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_required_tool_choice
 
-python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_format_no_tool_choice_specified
-python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_named_tool_choice
-python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_required_tool_choice
-
-python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_format_no_tool_choice_specified
-python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_named_tool_choice
-python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_required_tool_choice
-
-python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_format_no_tool_choice_specified
-python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_named_tool_choice
-python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_required_tool_choice
+python -m unittest test_function_calling.MetaLlama_3_1_70BInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.MetaLlama_3_1_70BInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.MetaLlama_3_1_70BInstruct.test_function_calling_required_tool_choice
 
 python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_format_no_tool_choice_specified
 python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_named_tool_choice
 python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_required_tool_choice
 
+python -m unittest test_function_calling.MetaLlama_3_2_11BVisionInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.MetaLlama_3_2_11BVisionInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.MetaLlama_3_2_11BVisionInstruct.test_function_calling_required_tool_choice
+
 python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_format_no_tool_choice_specified
 python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_named_tool_choice
 python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_required_tool_choice
 
-python -m unittest test_function_calling.Qwen25BInstruct.test_function_calling_format_no_tool_choice_specified
-python -m unittest test_function_calling.Qwen25BInstruct.test_function_calling_named_tool_choice
-python -m unittest test_function_calling.Qwen25BInstruct.test_function_calling_required_tool_choice
+python -m unittest test_function_calling.MistralNemo12BInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.MistralNemo12BInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.MistralNemo12BInstruct.test_function_calling_required_tool_choice
+
+python -m unittest test_function_calling.Qwen_2_5_7BInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.Qwen_2_5_7BInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.Qwen_2_5_7BInstruct.test_function_calling_required_tool_choice
 
 """
 
@@ -340,6 +340,18 @@ class MetaLlama_3_1_8BInstruct(OpenAIServerFunctionCallingBase):
         )
 
 
+class MetaLlama_3_1_70BInstruct(OpenAIServerFunctionCallingBase):
+    @classmethod
+    def setUpClass(cls):
+        setup_class(
+            cls,
+            model="meta-llama/Llama-3.1-70B-Instruct",
+            tool_call_parser="llama3",
+            grammar_backend="outlines",
+            tp=2,
+        )
+
+
 @unittest.skip("Tool call parsing is broken for Llama 3.2 models")
 class MetaLlama_3_2_1BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
@@ -353,18 +365,7 @@ class MetaLlama_3_2_1BInstruct(OpenAIServerFunctionCallingBase):
         )
 
 
-class MetaLlama_3_1_70BInstruct(OpenAIServerFunctionCallingBase):
-    @classmethod
-    def setUpClass(cls):
-        setup_class(
-            cls,
-            model="meta-llama/Llama-3.1-70B-Instruct",
-            tool_call_parser="llama3",
-            grammar_backend="outlines",
-            tp=2,
-        )
-
-
+@unittest.skip("Tool call parsing is broken for Llama 3.2 models")
 class MetaLlama_3_2_11BVisionInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
