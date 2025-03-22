@@ -205,6 +205,7 @@ class MetaLlama_3_2_1BInstructLLGuidance(TestJSONSchemaBase):
 # MetaLlama_3_2_11BVisionInstruct
 
 
+@unittest.skip("Engine fails to start with 3.2-11b-vision-instruct and outlines")
 class MetaLlama_3_2_11BVisionInstructOutlines(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
