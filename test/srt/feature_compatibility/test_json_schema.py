@@ -12,6 +12,7 @@ python -m unittest test_json_schema.MetaLlama_3_2_1BInstructOutlines.test_json_o
 python -m unittest test_json_schema.MetaLlama_3_2_1BInstructXGrammar.test_json_openai
 python -m unittest test_json_schema.MetaLlama_3_2_1BInstructLLGuidance.test_json_openai
 
+
 python -m unittest test_json_schema.MetaLlama_3_2_11BVisionInstructOutlines.test_json_openai
 python -m unittest test_json_schema.MetaLlama_3_2_11BVisionInstructXGrammar.test_json_openai
 python -m unittest test_json_schema.MetaLlama_3_2_11BVisionInstructLLGuidance.test_json_openai
@@ -300,7 +301,7 @@ class MistralNemo12BInstructLLGuidance(TestJSONSchemaBase):
 class Qwen_2_5_7BInstructOutlines(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="outlines", model="qwen/Qwen-2.5-7B-Instruct", tp=1)
+        setup_class(cls, backend="outlines", model="Qwen/Qwen-2.5-7B-Instruct", tp=1)
 
 
 class Qwen_2_5_7BInstructXGrammar(TestJSONSchemaBase):
