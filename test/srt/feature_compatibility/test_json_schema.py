@@ -204,14 +204,14 @@ class MetaLlama_3_2_1BInstructLLGuidance(TestJSONSchemaBase):
 # MetaLlama_3_2_11BVisionInstruct
 
 
-class MetaLlama_3_2_11BVisionInstruct(TestJSONSchemaBase):
+class MetaLlama_3_2_11BVisionInstructOutlines(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
         setup_class(
             cls,
             backend="outlines",
             model="meta-llama/Llama-3.2-11B-Vision-Instruct",
-            tp=2,
+            tp=1,
         )
 
 
@@ -222,7 +222,7 @@ class MetaLlama_3_2_11BVisionInstructXGrammar(TestJSONSchemaBase):
             cls,
             backend="xgrammar",
             model="meta-llama/Llama-3.2-11B-Vision-Instruct",
-            tp=2,
+            tp=1,
         )
 
 
@@ -233,7 +233,7 @@ class MetaLlama_3_2_11BVisionInstructLLGuidance(TestJSONSchemaBase):
             cls,
             backend="llguidance",
             model="meta-llama/Llama-3.2-11B-Vision-Instruct",
-            tp=2,
+            tp=1,
         )
 
 
