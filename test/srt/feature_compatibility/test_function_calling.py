@@ -1,3 +1,35 @@
+"""
+
+python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_required_tool_choice
+
+python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_required_tool_choice
+
+python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_required_tool_choice
+
+python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.MetaLlama_3_1_8BInstruct.test_function_calling_required_tool_choice
+
+python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.MetaLlama_3_2_1BInstruct.test_function_calling_required_tool_choice
+
+python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.MetaLlama_3_3_70BInstruct.test_function_calling_required_tool_choice
+
+python -m unittest test_function_calling.Qwen25BInstruct.test_function_calling_format_no_tool_choice_specified
+python -m unittest test_function_calling.Qwen25BInstruct.test_function_calling_named_tool_choice
+python -m unittest test_function_calling.Qwen25BInstruct.test_function_calling_required_tool_choice
+
+"""
+
 import json
 import time
 import unittest
@@ -15,7 +47,7 @@ from sglang.test.test_utils import (
 )
 
 
-def setup_class(cls, model : str, tool_call_parser: str, grammar_backend: str, tp: int):
+def setup_class(cls, model: str, tool_call_parser: str, grammar_backend: str, tp: int):
     cls.model = model
     cls.tool_call_parser = tool_call_parser
     cls.grammar_backend = grammar_backend
@@ -45,7 +77,13 @@ def setup_class(cls, model : str, tool_call_parser: str, grammar_backend: str, t
 class OpenAIServerFunctionCallingBase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, model=DEFAULT_SMALL_MODEL_NAME_FOR_TEST, tool_call_parser="llama3", grammar_backend="outlines", tp=1)
+        setup_class(
+            cls,
+            model=DEFAULT_SMALL_MODEL_NAME_FOR_TEST,
+            tool_call_parser="llama3",
+            grammar_backend="outlines",
+            tp=1,
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -70,8 +108,12 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
             tools=tools,
         )
 
-        self.assert_tool_call_format(response, expected_function_name="add", expected_function_arguments=["a", "b"])
-    
+        self.assert_tool_call_format(
+            response,
+            expected_function_name="add",
+            expected_function_arguments=["a", "b"],
+        )
+
     def test_function_calling_named_tool_choice(self):
         """
         Test: Whether the function call format returned by the AI is correct when using named function tool choice.
@@ -89,10 +131,14 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
             top_p=0.8,
             stream=False,
             tools=tools,
-            tool_choice={"type": "function", "function": {"name": "add"}}
+            tool_choice={"type": "function", "function": {"name": "add"}},
         )
 
-        self.assert_tool_call_format(response, expected_function_name="add", expected_function_arguments=["a", "b"])
+        self.assert_tool_call_format(
+            response,
+            expected_function_name="add",
+            expected_function_arguments=["a", "b"],
+        )
 
     def test_function_calling_required_tool_choice(self):
         """
@@ -111,10 +157,14 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
             top_p=0.8,
             stream=False,
             tools=tools,
-            tool_choice={"type": "required"}
+            tool_choice={"type": "required"},
         )
 
-        self.assert_tool_call_format(response, expected_function_name="add", expected_function_arguments=["a", "b"])
+        self.assert_tool_call_format(
+            response,
+            expected_function_name="add",
+            expected_function_arguments=["a", "b"],
+        )
 
     def test_function_calling_auto_tool_choice(self):
         """
@@ -133,10 +183,14 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
             top_p=0.8,
             stream=False,
             tools=tools,
-            tool_choice={"type": "auto"}
+            tool_choice={"type": "auto"},
         )
 
-        self.assert_tool_call_format(response, expected_function_name="add", expected_function_arguments=["a", "b"])
+        self.assert_tool_call_format(
+            response,
+            expected_function_name="add",
+            expected_function_arguments=["a", "b"],
+        )
 
     def test_function_calling_streaming_args_parsing(self):
         """
@@ -146,9 +200,7 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
         """
         client = openai.Client(api_key=self.api_key, base_url=self.base_url)
 
-        tools = [
-            self.get_add_tool()
-        ]
+        tools = [self.get_add_tool()]
 
         messages = [
             {"role": "user", "content": "Please sum 5 and 7, just call the function."}
@@ -199,8 +251,12 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
         )
         self.assertEqual(args_obj["b"], 7, "Parameter b should be 7")
 
-
-    def assert_tool_call_format(self, response, expected_function_name : Optional[str] = None):
+    def assert_tool_call_format(
+        self,
+        response,
+        expected_function_name: Optional[str] = None,
+        expected_function_arguments: Optional[list] = None,
+    ):
         content = response.choices[0].message.content
         tool_calls = response.choices[0].message.tool_calls
 
@@ -214,7 +270,15 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
 
         function_name = tool_calls[0].function.name
         if expected_function_name is not None:
-            assert function_name == expected_function_name, f"Function name should be '{expected_function_name}'"
+            assert (
+                function_name == expected_function_name
+            ), f"Function name should be '{expected_function_name}'"
+
+        if expected_function_arguments is not None:
+            actual_function_arguments = json.loads(tool_calls[0].function.arguments)
+            assert set(actual_function_arguments) == set(
+                expected_function_arguments
+            ), f"Function argument names should be {expected_function_arguments}, arguments were {actual_function_arguments}"
 
     def get_add_tool(self):
         return {
@@ -260,48 +324,94 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
                         "required": ["city", "unit"],
                     },
                 },
-            }
+            },
         }
 
 
 class MetaLlama_3_1_8BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, model="meta-llama/Llama-3.1-8B-Instruct", tool_call_parser="llama3", grammar_backend="outlines", tp=1)
+        setup_class(
+            cls,
+            model="meta-llama/Llama-3.1-8B-Instruct",
+            tool_call_parser="llama3",
+            grammar_backend="outlines",
+            tp=1,
+        )
 
 
 @unittest.skip("Tool call parsing is broken for Llama 3.2 models")
 class MetaLlama_3_2_1BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, model="meta-llama/Llama-3.2-1B-Instruct", tool_call_parser="llama3", grammar_backend="outlines", tp=1)
+        setup_class(
+            cls,
+            model="meta-llama/Llama-3.2-1B-Instruct",
+            tool_call_parser="llama3",
+            grammar_backend="outlines",
+            tp=1,
+        )
+
 
 class MetaLlama_3_1_70BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, model="meta-llama/Llama-3.1-70B-Instruct", tool_call_parser="llama3", grammar_backend="outlines", tp=2)
+        setup_class(
+            cls,
+            model="meta-llama/Llama-3.1-70B-Instruct",
+            tool_call_parser="llama3",
+            grammar_backend="outlines",
+            tp=2,
+        )
+
 
 class MetaLlama_3_2_11BVisionInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, model="meta-llama/Llama-3.2-11B-Vision-Instruct", tool_call_parser="llama3", grammar_backend="outlines", tp=1)
+        setup_class(
+            cls,
+            model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+            tool_call_parser="llama3",
+            grammar_backend="outlines",
+            tp=1,
+        )
 
 
 class MetaLlama_3_3_70BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, model="meta-llama/Llama-3.3-70B-Instruct", tool_call_parser="llama3", grammar_backend="outlines", tp=2)
+        setup_class(
+            cls,
+            model="meta-llama/Llama-3.3-70B-Instruct",
+            tool_call_parser="llama3",
+            grammar_backend="outlines",
+            tp=2,
+        )
 
 
 class MistralNemo12BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, model="nvidia/Mistral-NeMo-12B-Instruct", tool_call_parser="mistral", grammar_backend="outlines", tp=1)
+        setup_class(
+            cls,
+            model="nvidia/Mistral-NeMo-12B-Instruct",
+            tool_call_parser="mistral",
+            grammar_backend="outlines",
+            tp=1,
+        )
+
 
 class Qwen_2_5_7BInstruct(OpenAIServerFunctionCallingBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, model="Qwen/Qwen2.5-7B-Instruct", tool_call_parser="qwen25", grammar_backend="outlines", tp=1)
+        setup_class(
+            cls,
+            model="Qwen/Qwen2.5-7B-Instruct",
+            tool_call_parser="qwen25",
+            grammar_backend="outlines",
+            tp=1,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

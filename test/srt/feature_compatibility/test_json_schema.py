@@ -83,88 +83,147 @@ class TestJSONSchemaBase(unittest.TestCase):
 
 # MetaLlama_3_1_8BInstruct
 
+
 class MetaLlama_3_1_8BInstructOutlines(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="outlines", model = "meta-llama/Llama-3.1-8B-Instruct", tp = 1)
+        setup_class(
+            cls, backend="outlines", model="meta-llama/Llama-3.1-8B-Instruct", tp=1
+        )
+
 
 class MetaLlama_3_1_8BInstructXGrammar(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="xgrammar", model = "meta-llama/Llama-3.1-8B-Instruct", tp = 1)  
+        setup_class(
+            cls, backend="xgrammar", model="meta-llama/Llama-3.1-8B-Instruct", tp=1
+        )
+
 
 class MetaLlama_3_1_8BInstructLLGuidance(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="llguidance", model = "meta-llama/Llama-3.1-8B-Instruct", tp = 1)      
+        setup_class(
+            cls, backend="llguidance", model="meta-llama/Llama-3.1-8B-Instruct", tp=1
+        )
+
 
 # MetaLlama_3_1_70BInstruct
+
 
 class MetaLlama_3_1_70BInstructOutlines(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="outlines", model = "meta-llama/Llama-3.1-70B-Instruct", tp = 2)
+        setup_class(
+            cls, backend="outlines", model="meta-llama/Llama-3.1-70B-Instruct", tp=2
+        )
+
 
 class MetaLlama_3_1_70BInstructXGrammar(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="xgrammar", model = "meta-llama/Llama-3.1-70B-Instruct", tp = 2)
+        setup_class(
+            cls, backend="xgrammar", model="meta-llama/Llama-3.1-70B-Instruct", tp=2
+        )
+
 
 class MetaLlama_3_1_70BInstructLLGuidance(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="llguidance", model = "meta-llama/Llama-3.1-70B-Instruct", tp = 2)
+        setup_class(
+            cls, backend="llguidance", model="meta-llama/Llama-3.1-70B-Instruct", tp=2
+        )
+
 
 # MetaLlama_3_2_11BVisionInstruct
+
 
 class MetaLlama_3_2_11BVisionInstruct(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="outlines", model = "meta-llama/Llama-3.2-11B-Vision-Instruct", tp = 2)
+        setup_class(
+            cls,
+            backend="outlines",
+            model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+            tp=2,
+        )
+
 
 class MetaLlama_3_2_11BVisionInstructXGrammar(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="xgrammar", model = "meta-llama/Llama-3.2-11B-Vision-Instruct", tp = 2)  
+        setup_class(
+            cls,
+            backend="xgrammar",
+            model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+            tp=2,
+        )
+
 
 class MetaLlama_3_2_11BVisionInstructLLGuidance(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="llguidance", model = "meta-llama/Llama-3.2-11B-Vision-Instruct", tp = 2)                
+        setup_class(
+            cls,
+            backend="llguidance",
+            model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+            tp=2,
+        )
+
 
 # MetaLlama_3_3_70BInstruct
+
 
 class MetaLlama_3_3_70BInstructOutlines(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="outlines", model = "meta-llama/Llama-3.3-70B-Instruct", tp = 2)
+        setup_class(
+            cls, backend="outlines", model="meta-llama/Llama-3.3-70B-Instruct", tp=2
+        )
+
 
 class MetaLlama_3_3_70BInstructXGrammar(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="xgrammar", model = "meta-llama/Llama-3.3-70B-Instruct", tp = 2)        
+        setup_class(
+            cls, backend="xgrammar", model="meta-llama/Llama-3.3-70B-Instruct", tp=2
+        )
+
 
 class MetaLlama_3_3_70BInstructLLGuidance(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="llguidance", model = "meta-llama/Llama-3.3-70B-Instruct", tp = 2)                
+        setup_class(
+            cls, backend="llguidance", model="meta-llama/Llama-3.3-70B-Instruct", tp=2
+        )
+
 
 # MistralNemo12BInstruct
+
 
 class MistralNemo12BInstructOutlines(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="outlines", model = "nvidia/Mistral-NeMo-12B-Instruct", tp = 1)
+        setup_class(
+            cls, backend="outlines", model="nvidia/Mistral-NeMo-12B-Instruct", tp=1
+        )
+
 
 class MistralNemo12BInstructXGrammar(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="xgrammar", model = "nvidia/Mistral-NeMo-12B-Instruct", tp = 1)        
+        setup_class(
+            cls, backend="xgrammar", model="nvidia/Mistral-NeMo-12B-Instruct", tp=1
+        )
+
 
 class MistralNemo12BInstructLLGuidance(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="llguidance", model = "nvidia/Mistral-NeMo-12B-Instruct", tp = 1)                
+        setup_class(
+            cls, backend="llguidance", model="nvidia/Mistral-NeMo-12B-Instruct", tp=1
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
