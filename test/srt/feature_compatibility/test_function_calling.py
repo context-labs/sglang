@@ -395,7 +395,7 @@ class MistralNemo12BInstruct(OpenAIServerFunctionCallingBase):
     def setUpClass(cls):
         setup_class(
             cls,
-            model="nvidia/Mistral-NeMo-12B-Instruct",
+            model="mistralai/Mistral-Nemo-Instruct-2407",
             tool_call_parser="mistral",
             grammar_backend="outlines",
             tp=1,
