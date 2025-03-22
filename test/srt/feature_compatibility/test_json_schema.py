@@ -1,9 +1,39 @@
+"""
+
+python -m unittest test_json_schema.MetaLlama_3_1_8BInstructOutlines.test_json_openai
+python -m unittest test_json_schema.MetaLlama_3_1_8BInstructXGrammar.test_json_openai
+python -m unittest test_json_schema.MetaLlama_3_1_8BInstructLLGuidance.test_json_openai
+
+python -m unittest test_json_schema.MetaLlama_3_1_70BInstructOutlines.test_json_openai
+python -m unittest test_json_schema.MetaLlama_3_1_70BInstructXGrammar.test_json_openai
+python -m unittest test_json_schema.MetaLlama_3_1_70BInstructLLGuidance.test_json_openai
+
+python -m unittest test_json_schema.MetaLlama_3_2_1BInstructOutlines.test_json_openai
+python -m unittest test_json_schema.MetaLlama_3_2_1BInstructXGrammar.test_json_openai
+python -m unittest test_json_schema.MetaLlama_3_2_1BInstructLLGuidance.test_json_openai
+
+python -m unittest test_json_schema.MetaLlama_3_2_11BVisionInstructOutlines.test_json_openai
+python -m unittest test_json_schema.MetaLlama_3_2_11BVisionInstructXGrammar.test_json_openai
+python -m unittest test_json_schema.MetaLlama_3_2_11BVisionInstructLLGuidance.test_json_openai
+
+python -m unittest test_json_schema.MetaLlama_3_3_70BInstructOutlines.test_json_openai
+python -m unittest test_json_schema.MetaLlama_3_3_70BInstructXGrammar.test_json_openai
+python -m unittest test_json_schema.MetaLlama_3_3_70BInstructLLGuidance.test_json_openai
+
+python -m unittest test_json_schema.MistralNemo12BInstructOutlines.test_json_openai
+python -m unittest test_json_schema.MistralNemo12BInstructXGrammar.test_json_openai
+python -m unittest test_json_schema.MistralNemo12BInstructLLGuidance.test_json_openai
+
+python -m unittest test_json_schema.Qwen_2_5_7BInstructOutlines.test_json_openai
+python -m unittest test_json_schema.Qwen_2_5_7BInstructXGrammar.test_json_openai
+python -m unittest test_json_schema.Qwen_2_5_7BInstructLLGuidance.test_json_openai
+
+"""
+
 import json
 import unittest
-from concurrent.futures import ThreadPoolExecutor
 
 import openai
-import requests
 
 from sglang.srt.utils import kill_process_tree
 from sglang.test.test_utils import (
@@ -135,6 +165,42 @@ class MetaLlama_3_1_70BInstructLLGuidance(TestJSONSchemaBase):
         )
 
 
+# MetaLlama_3_2_1BInstruct
+
+
+class MetaLlama_3_2_1BInstructOutlines(TestJSONSchemaBase):
+    @classmethod
+    def setUpClass(cls):
+        setup_class(
+            cls,
+            backend="outlines",
+            model="meta-llama/Llama-3.2-1B-Instruct",
+            tp=1,
+        )
+
+
+class MetaLlama_3_2_1BInstructXGrammar(TestJSONSchemaBase):
+    @classmethod
+    def setUpClass(cls):
+        setup_class(
+            cls,
+            backend="xgrammar",
+            model="meta-llama/Llama-3.2-1B-Instruct",
+            tp=1,
+        )
+
+
+class MetaLlama_3_2_1BInstructLLGuidance(TestJSONSchemaBase):
+    @classmethod
+    def setUpClass(cls):
+        setup_class(
+            cls,
+            backend="llguidance",
+            model="meta-llama/Llama-3.2-1B-Instruct",
+            tp=1,
+        )
+
+
 # MetaLlama_3_2_11BVisionInstruct
 
 
@@ -205,7 +271,7 @@ class MistralNemo12BInstructOutlines(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
         setup_class(
-            cls, backend="outlines", model="nvidia/Mistral-NeMo-12B-Instruct", tp=1
+            cls, backend="outlines", model="mistralai/Mistral-Nemo-Instruct-2407", tp=1
         )
 
 
@@ -213,7 +279,7 @@ class MistralNemo12BInstructXGrammar(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
         setup_class(
-            cls, backend="xgrammar", model="nvidia/Mistral-NeMo-12B-Instruct", tp=1
+            cls, backend="xgrammar", model="mistralai/Mistral-Nemo-Instruct-2407", tp=1
         )
 
 
@@ -221,8 +287,32 @@ class MistralNemo12BInstructLLGuidance(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
         setup_class(
-            cls, backend="llguidance", model="nvidia/Mistral-NeMo-12B-Instruct", tp=1
+            cls,
+            backend="llguidance",
+            model="mistralai/Mistral-Nemo-Instruct-2407",
+            tp=1,
         )
+
+
+# Qwen_2_5_7BInstruct
+
+
+class Qwen_2_5_7BInstructOutlines(TestJSONSchemaBase):
+    @classmethod
+    def setUpClass(cls):
+        setup_class(cls, backend="outlines", model="qwen/Qwen-2.5-7B-Instruct", tp=1)
+
+
+class Qwen_2_5_7BInstructXGrammar(TestJSONSchemaBase):
+    @classmethod
+    def setUpClass(cls):
+        setup_class(cls, backend="xgrammar", model="Qwen/Qwen2.5-7B-Instruct", tp=1)
+
+
+class Qwen_2_5_7BInstructLLGuidance(TestJSONSchemaBase):
+    @classmethod
+    def setUpClass(cls):
+        setup_class(cls, backend="llguidance", model="Qwen/Qwen2.5-7B-Instruct", tp=1)
 
 
 if __name__ == "__main__":
