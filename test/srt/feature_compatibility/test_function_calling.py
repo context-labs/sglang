@@ -157,7 +157,7 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
             top_p=0.8,
             stream=False,
             tools=tools,
-            tool_choice={"type": "required"},
+            tool_choice="required",
         )
 
         self.assert_tool_call_format(
@@ -183,7 +183,7 @@ class OpenAIServerFunctionCallingBase(unittest.TestCase):
             top_p=0.8,
             stream=False,
             tools=tools,
-            tool_choice={"type": "auto"},
+            tool_choice="auto",
         )
 
         self.assert_tool_call_format(
