@@ -80,6 +80,10 @@ suites = {
     "nightly": [
         TestFile("test_nightly_gsm8k_eval.py"),
     ],
+    "feature_compatibility_regression_test": [
+        TestFile("feature_compatibility/test_function_calling.py"),
+        TestFile("feature_compatibility/test_json_schema.py"),
+    ],
 }
 
 
