@@ -301,7 +301,7 @@ class MistralNemo12BInstructLLGuidance(TestJSONSchemaBase):
 class Qwen_2_5_7BInstructOutlines(TestJSONSchemaBase):
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, backend="outlines", model="Qwen/Qwen-2.5-7B-Instruct", tp=1)
+        setup_class(cls, backend="outlines", model="Qwen/Qwen2.5-7B-Instruct", tp=1)
 
 
 class Qwen_2_5_7BInstructXGrammar(TestJSONSchemaBase):
