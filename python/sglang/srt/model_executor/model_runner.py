@@ -55,7 +55,7 @@ from sglang.srt.mem_cache.memory_pool import (
 )
 from sglang.srt.mem_cache.paged_allocator import PagedTokenToKVPoolAllocator
 from sglang.srt.model_executor.cuda_graph_runner import CudaGraphRunner
-from sglang.srt.model_executor.forward_batch_info import ForwardBatch
+from sglang.srt.model_executor.forward_batch_info import CaptureHiddenMode, ForwardBatch
 from sglang.srt.model_loader import get_model
 from sglang.srt.model_loader.loader import (
     DefaultModelLoader,
@@ -122,6 +122,34 @@ class ModelRunner:
         self.page_size = server_args.page_size
         self.req_to_token_pool = req_to_token_pool
         self.token_to_kv_pool_allocator = token_to_kv_pool_allocator
+
+        # Activation saving setup
+        self.save_activations = server_args.toploc_fingerprint
+        if self.save_activations:
+            self.save_dir = os.path.join(
+                os.path.dirname(model_config.model_path), "activations"
+            )
+            os.makedirs(self.save_dir, exist_ok=True)
+            self.saved_activations = []
+            self.current_forward_batch = None  # Track current batch for hook
+            self.capture_hidden_mode = (
+                CaptureHiddenMode.LAST
+            )  # Only capture final hidden state
+
+            # Define hook to capture activations
+            def activation_hook(module, input, output):
+                print("Activation hook called")
+                hidden_states = output[0].detach().clone().cpu()
+                print("Activation hook dimensions: ", hidden_states.shape)
+                self.saved_activations.append(
+                    {
+                        "hidden_states": hidden_states,  # [batch_size, hidden_dim]
+                    }
+                )
+                self.save_activations_to_disk()
+
+            # Register hook on final norm layer after model is loaded
+            self.activation_hook = activation_hook
 
         # Model-specific adjustment
         self.model_specific_adjustment()
@@ -439,6 +467,10 @@ class ModelRunner:
             raise ValueError(
                 f"TP rank {self.tp_rank} could finish the model loading, but there are other ranks that didn't finish loading. It is likely due to unexpected failures (e.g., OOM) or a slow node."
             ) from None
+
+        # Register activation hook if needed
+        if self.save_activations:
+            self.model.model.norm.register_forward_hook(self.activation_hook)
 
     def update_weights_from_disk(
         self, model_path: str, load_format: str
@@ -961,6 +993,12 @@ class ModelRunner:
     def forward(
         self, forward_batch: ForwardBatch, skip_attn_backend_init: bool = False
     ) -> LogitsProcessorOutput:
+        """Run the forward pass."""
+        # Track current batch for activation hook if needed
+        if self.save_activations:
+            forward_batch.capture_hidden_mode = self.capture_hidden_mode
+
+        # Run cuda graph if possible
         if (
             forward_batch.forward_mode.is_cuda_graph()
             and self.cuda_graph_runner
@@ -980,6 +1018,27 @@ class ModelRunner:
             return self.forward_idle(forward_batch)
         else:
             raise ValueError(f"Invalid forward mode: {forward_batch.forward_mode}")
+
+    def save_activations_to_disk(self):
+        if not self.saved_activations:
+            return
+
+        filename = f"activations_{len(os.listdir(self.save_dir))}.pt"
+        save_path = os.path.join(self.save_dir, filename)
+
+        torch.save(
+            {
+                "activations": self.saved_activations,
+                "model_config": {
+                    "model_name": self.model_config.model_name,
+                    "hidden_size": self.model_config.hidden_size,
+                    "num_attention_heads": self.model_config.num_attention_heads,
+                },
+            },
+            save_path,
+        )
+
+        self.saved_activations = []
 
     def _preprocess_logits(
         self, logits_output: LogitsProcessorOutput, sampling_info: SamplingBatchInfo
