@@ -135,9 +135,16 @@ class ModelRunner:
             self.capture_hidden_mode = (
                 CaptureHiddenMode.LAST
             )  # Only capture final hidden state
+            self.is_cuda_graph_capturing = (
+                False  # Flag to track CUDA graph capturing state
+            )
 
             # Define hook to capture activations
             def activation_hook(module, input, output):
+                # Skip activation capture during CUDA graph capturing
+                if self.is_cuda_graph_capturing:
+                    return output
+
                 print("Activation hook called")
                 hidden_states = output[0].detach().clone().cpu()
                 print("Activation hook dimensions: ", hidden_states.shape)
@@ -147,6 +154,7 @@ class ModelRunner:
                     }
                 )
                 self.save_activations_to_disk()
+                return output
 
             # Register hook on final norm layer after model is loaded
             self.activation_hook = activation_hook
@@ -938,7 +946,17 @@ class ModelRunner:
         logger.info(
             f"Capture cuda graph begin. This can take up to several minutes. avail mem={before_mem:.2f} GB"
         )
+
+        # Set the flag to indicate we're capturing CUDA graphs
+        if hasattr(self, "is_cuda_graph_capturing"):
+            self.is_cuda_graph_capturing = True
+
         self.cuda_graph_runner = CudaGraphRunner(self)
+
+        # Reset the flag after capture is complete
+        if hasattr(self, "is_cuda_graph_capturing"):
+            self.is_cuda_graph_capturing = False
+
         after_mem = get_available_gpu_memory(self.device, self.gpu_id)
         logger.info(
             f"Capture cuda graph end. Time elapsed: {time.time() - tic:.2f} s. "
@@ -1026,15 +1044,10 @@ class ModelRunner:
         filename = f"activations_{len(os.listdir(self.save_dir))}.pt"
         save_path = os.path.join(self.save_dir, filename)
 
+        print(f"Saving activations to disk at {save_path}")
+
         torch.save(
-            {
-                "activations": self.saved_activations,
-                "model_config": {
-                    "model_name": self.model_config.model_name,
-                    "hidden_size": self.model_config.hidden_size,
-                    "num_attention_heads": self.model_config.num_attention_heads,
-                },
-            },
+            {"activations": self.saved_activations},
             save_path,
         )
 

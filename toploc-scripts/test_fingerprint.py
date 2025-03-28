@@ -1,10 +1,13 @@
 import json
+import os
 import time
 
 from dotenv import load_dotenv
 
 # load from .env in the same directory as this script
-load_dotenv(dotenv_path=".env", verbose=True)
+load_dotenv()
+
+print("hf_token", os.getenv("HF_TOKEN", ""))
 
 from sglang.test.test_utils import is_in_ci
 from sglang.utils import print_highlight, terminate_process, wait_for_server
@@ -17,7 +20,7 @@ else:
 
 server_process, port = launch_server_cmd(
     """
-python -m sglang.launch_server --model-path meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0
+python -m sglang.launch_server --model-path meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --toploc-fingerprint
 """
 )
 

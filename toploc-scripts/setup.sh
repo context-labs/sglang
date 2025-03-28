@@ -19,5 +19,6 @@ pip install transformers==4.48.3
 pip install datasets
 pip install pre-commit
 pip install dotenv
+pip install -U toploc
 pre-commit install
 deactivate
