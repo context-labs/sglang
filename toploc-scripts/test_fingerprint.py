@@ -3,7 +3,8 @@ import time
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# load from .env in the same directory as this script
+load_dotenv(dotenv_path=".env", verbose=True)
 
 from sglang.test.test_utils import is_in_ci
 from sglang.utils import print_highlight, terminate_process, wait_for_server
