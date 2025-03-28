@@ -18,12 +18,14 @@ import gc
 import json
 import logging
 import os
+import threading
 import time
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
 import torch
 import torch.distributed as dist
+from toploc import build_proofs_base64
 
 from sglang.srt.configs.device_config import DeviceConfig
 from sglang.srt.configs.load_config import LoadConfig
@@ -122,6 +124,8 @@ class ModelRunner:
         self.page_size = server_args.page_size
         self.req_to_token_pool = req_to_token_pool
         self.token_to_kv_pool_allocator = token_to_kv_pool_allocator
+        self.latest_proofs = []
+        self.proofs_lock = threading.Lock()
 
         # Activation saving setup
         self.save_activations = server_args.toploc_fingerprint
@@ -131,7 +135,6 @@ class ModelRunner:
             )
             os.makedirs(self.save_dir, exist_ok=True)
             self.saved_activations = []
-            self.current_forward_batch = None  # Track current batch for hook
             self.capture_hidden_mode = (
                 CaptureHiddenMode.LAST
             )  # Only capture final hidden state
@@ -139,24 +142,35 @@ class ModelRunner:
                 False  # Flag to track CUDA graph capturing state
             )
 
-            # Define hook to capture activations
+            # Define hook to capture activations for final hidden state
             def activation_hook(module, input, output):
+
                 # Skip activation capture during CUDA graph capturing
                 if self.is_cuda_graph_capturing:
+                    print("-->Skipping activation capture during CUDA graph capturing")
                     return output
 
-                print("Activation hook called")
+                print("-->Activation hook called")
                 hidden_states = output[0].detach().clone().cpu()
-                print("Activation hook dimensions: ", hidden_states.shape)
+                print("-->Activation hook dimensions: ", hidden_states.shape)
+                """
                 self.saved_activations.append(
                     {
                         "hidden_states": hidden_states,  # [batch_size, hidden_dim]
                     }
-                )
+                )"""
+                proof = build_proofs_base64(
+                    [hidden_states], decode_batching_size=3, topk=4, skip_prefill=False
+                )[0]
+
+                with self.proofs_lock:
+                    self.latest_proofs.append(proof)
+
                 self.save_activations_to_disk()
+
                 return output
 
-            # Register hook on final norm layer after model is loaded
+            # We will register hook on final norm layer after model is loaded
             self.activation_hook = activation_hook
 
         # Model-specific adjustment
@@ -1022,20 +1036,30 @@ class ModelRunner:
             and self.cuda_graph_runner
             and self.cuda_graph_runner.can_run(forward_batch)
         ):
-            return self.cuda_graph_runner.replay(
+            output = self.cuda_graph_runner.replay(
                 forward_batch, skip_attn_backend_init=skip_attn_backend_init
             )
-
-        if forward_batch.forward_mode.is_decode():
-            return self.forward_decode(forward_batch)
+        elif forward_batch.forward_mode.is_decode():
+            output = self.forward_decode(forward_batch)
         elif forward_batch.forward_mode.is_extend():
-            return self.forward_extend(
+            output = self.forward_extend(
                 forward_batch, skip_attn_backend_init=skip_attn_backend_init
             )
         elif forward_batch.forward_mode.is_idle():
-            return self.forward_idle(forward_batch)
+            output = self.forward_idle(forward_batch)
         else:
             raise ValueError(f"Invalid forward mode: {forward_batch.forward_mode}")
+
+        # Attach proofs if available
+        if self.save_activations:
+            with self.proofs_lock:
+                if self.latest_proofs:
+                    output.proofs = (
+                        self.latest_proofs.copy()
+                    )  # Copy to avoid modification during use
+                    self.latest_proofs = []  # Clear after attaching
+
+        return output
 
     def save_activations_to_disk(self):
         if not self.saved_activations:
