@@ -153,12 +153,12 @@ class ModelRunner:
                 print("-->Activation hook called")
                 hidden_states = output[0].detach().clone().cpu()
                 print("-->Activation hook dimensions: ", hidden_states.shape)
-                """
+
                 self.saved_activations.append(
                     {
                         "hidden_states": hidden_states,  # [batch_size, hidden_dim]
                     }
-                )"""
+                )
                 proof = build_proofs_base64(
                     [hidden_states], decode_batching_size=3, topk=4, skip_prefill=False
                 )[0]
