@@ -124,8 +124,6 @@ class ModelRunner:
         self.page_size = server_args.page_size
         self.req_to_token_pool = req_to_token_pool
         self.token_to_kv_pool_allocator = token_to_kv_pool_allocator
-        self.latest_proofs = []
-        self.proofs_lock = threading.Lock()
 
         # Activation saving setup
         self.save_activations = server_args.toploc_fingerprint
@@ -921,15 +919,7 @@ class ModelRunner:
             f"Capture cuda graph begin. This can take up to several minutes. avail mem={before_mem:.2f} GB"
         )
 
-        # Set the flag to indicate we're capturing CUDA graphs
-        if hasattr(self, "is_cuda_graph_capturing"):
-            self.is_cuda_graph_capturing = True
-
         self.cuda_graph_runner = CudaGraphRunner(self)
-
-        # Reset the flag after capture is complete
-        if hasattr(self, "is_cuda_graph_capturing"):
-            self.is_cuda_graph_capturing = False
 
         after_mem = get_available_gpu_memory(self.device, self.gpu_id)
         logger.info(
@@ -986,31 +976,25 @@ class ModelRunner:
         self, forward_batch: ForwardBatch, skip_attn_backend_init: bool = False
     ) -> LogitsProcessorOutput:
         """Run the forward pass."""
-        # Track current batch for activation hook if needed
-        if self.save_activations:
-            forward_batch.capture_hidden_mode = self.capture_hidden_mode
-
         # Run cuda graph if possible
         if (
             forward_batch.forward_mode.is_cuda_graph()
             and self.cuda_graph_runner
             and self.cuda_graph_runner.can_run(forward_batch)
         ):
-            output = self.cuda_graph_runner.replay(
+            return self.cuda_graph_runner.replay(
                 forward_batch, skip_attn_backend_init=skip_attn_backend_init
             )
         elif forward_batch.forward_mode.is_decode():
-            output = self.forward_decode(forward_batch)
+            return self.forward_decode(forward_batch)
         elif forward_batch.forward_mode.is_extend():
-            output = self.forward_extend(
+            return self.forward_extend(
                 forward_batch, skip_attn_backend_init=skip_attn_backend_init
             )
         elif forward_batch.forward_mode.is_idle():
-            output = self.forward_idle(forward_batch)
+            return self.forward_idle(forward_batch)
         else:
             raise ValueError(f"Invalid forward mode: {forward_batch.forward_mode}")
-
-        return output
 
     def _preprocess_logits(
         self, logits_output: LogitsProcessorOutput, sampling_info: SamplingBatchInfo
