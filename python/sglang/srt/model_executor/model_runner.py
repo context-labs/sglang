@@ -985,7 +985,7 @@ class ModelRunner:
             return self.cuda_graph_runner.replay(
                 forward_batch, skip_attn_backend_init=skip_attn_backend_init
             )
-        elif forward_batch.forward_mode.is_decode():
+        if forward_batch.forward_mode.is_decode():
             return self.forward_decode(forward_batch)
         elif forward_batch.forward_mode.is_extend():
             return self.forward_extend(
