@@ -238,6 +238,13 @@ class CudaGraphRunner:
                     dtype=self.model_runner.dtype,
                 )
 
+            if self.model_runner.verification_algorithm.is_toploc():
+                self.verification_hidden_states = torch.zeros(
+                    (1, self.model_runner.model_config.hidden_size),
+                    dtype=self.model_runner.dtype,
+                )
+                self.verification_proof = None
+
             if self.is_encoder_decoder:
                 # NOTE: encoder_lens can influence the full_text_row_masked_out_mask tensor when doing mixed batch
                 self.encoder_lens = torch.full(

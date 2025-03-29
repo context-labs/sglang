@@ -130,48 +130,12 @@ class ModelRunner:
         # Activation saving setup
         self.save_activations = server_args.toploc_fingerprint
         if self.save_activations:
-            self.save_dir = os.path.join(
-                os.path.dirname(model_config.model_path), "activations"
-            )
-            os.makedirs(self.save_dir, exist_ok=True)
-            self.saved_activations = []
             self.capture_hidden_mode = (
                 CaptureHiddenMode.LAST
             )  # Only capture final hidden state
             self.is_cuda_graph_capturing = (
                 False  # Flag to track CUDA graph capturing state
             )
-
-            # Define hook to capture activations for final hidden state
-            def activation_hook(module, input, output):
-
-                # Skip activation capture during CUDA graph capturing
-                if self.is_cuda_graph_capturing:
-                    print("-->Skipping activation capture during CUDA graph capturing")
-                    return output
-
-                print("-->Activation hook called")
-                hidden_states = output[0].detach().clone().cpu()
-                print("-->Activation hook dimensions: ", hidden_states.shape)
-
-                self.saved_activations.append(
-                    {
-                        "hidden_states": hidden_states,  # [batch_size, hidden_dim]
-                    }
-                )
-                proof = build_proofs_base64(
-                    [hidden_states], decode_batching_size=3, topk=4, skip_prefill=False
-                )[0]
-
-                with self.proofs_lock:
-                    self.latest_proofs.append(proof)
-
-                self.save_activations_to_disk()
-
-                return output
-
-            # We will register hook on final norm layer after model is loaded
-            self.activation_hook = activation_hook
 
         # Model-specific adjustment
         self.model_specific_adjustment()
@@ -489,10 +453,6 @@ class ModelRunner:
             raise ValueError(
                 f"TP rank {self.tp_rank} could finish the model loading, but there are other ranks that didn't finish loading. It is likely due to unexpected failures (e.g., OOM) or a slow node."
             ) from None
-
-        # Register activation hook if needed
-        if self.save_activations:
-            self.model.model.norm.register_forward_hook(self.activation_hook)
 
     def update_weights_from_disk(
         self, model_path: str, load_format: str
@@ -1050,32 +1010,7 @@ class ModelRunner:
         else:
             raise ValueError(f"Invalid forward mode: {forward_batch.forward_mode}")
 
-        # Attach proofs if available
-        if self.save_activations:
-            with self.proofs_lock:
-                if self.latest_proofs:
-                    output.proofs = (
-                        self.latest_proofs.copy()
-                    )  # Copy to avoid modification during use
-                    self.latest_proofs = []  # Clear after attaching
-
         return output
-
-    def save_activations_to_disk(self):
-        if not self.saved_activations:
-            return
-
-        filename = f"activations_{len(os.listdir(self.save_dir))}.pt"
-        save_path = os.path.join(self.save_dir, filename)
-
-        print(f"Saving activations to disk at {save_path}")
-
-        torch.save(
-            {"activations": self.saved_activations},
-            save_path,
-        )
-
-        self.saved_activations = []
 
     def _preprocess_logits(
         self, logits_output: LogitsProcessorOutput, sampling_info: SamplingBatchInfo

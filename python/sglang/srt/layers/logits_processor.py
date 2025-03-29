@@ -54,8 +54,10 @@ class LogitsProcessorOutput:
     # The last hidden layers
     hidden_states: Optional[torch.Tensor] = None
 
-    # Used by proof generation
-    proofs: Optional[list] = None
+    # Used by verification
+    verification_hidden_states: Optional[torch.Tensor] = None
+    # Used by verification
+    verification_proof: Optional[list] = None
 
     ## Part 2: This part will be assigned in python/sglang/srt/layers/sampler.py::Sampler
     # The logprobs of the next tokens.                              shape: [#seq]
