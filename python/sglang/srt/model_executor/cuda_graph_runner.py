@@ -541,13 +541,15 @@ class CudaGraphRunner:
         self.graphs[self.bs].replay()
         next_token_logits, hidden_states = self.output_buffers[self.bs]
 
+        hidden_states = (
+            hidden_states[: self.raw_num_token] if hidden_states is not None else None
+        )
+
         logits_output = LogitsProcessorOutput(
             next_token_logits=next_token_logits[: self.raw_num_token],
-            hidden_states=(
-                hidden_states[: self.raw_num_token]
-                if hidden_states is not None
-                else None
-            ),
+            hidden_states=hidden_states,
+            # Because CUDA_GRAPH only runs in DECODE mode, every n in N for [N,hidden_dimension] is a "last token"
+            verification_hidden_states=hidden_states,
         )
         return logits_output
 

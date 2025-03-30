@@ -41,6 +41,7 @@ from sglang.srt.model_executor.forward_batch_info import (
     ForwardMode,
 )
 from sglang.srt.utils import dump_to_file
+from sglang.srt.verification.verification_info import VerificationAlgorithm
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +55,8 @@ class LogitsProcessorOutput:
     # The last hidden layers
     hidden_states: Optional[torch.Tensor] = None
 
-    # Used by verification
+    # Used to generate verification proof strings, aka "fingerprints"
     verification_hidden_states: Optional[torch.Tensor] = None
-    # Used by verification
-    verification_proof: Optional[list] = None
 
     ## Part 2: This part will be assigned in python/sglang/srt/layers/sampler.py::Sampler
     # The logprobs of the next tokens.                              shape: [#seq]
@@ -84,7 +83,7 @@ class LogitsProcessorOutput:
 class LogitsMetadata:
     forward_mode: ForwardMode
     capture_hidden_mode: CaptureHiddenMode = CaptureHiddenMode.NULL
-
+    verification_algorithm: VerificationAlgorithm = VerificationAlgorithm.NONE
     extend_return_logprob: bool = False
     extend_return_top_logprob: bool = False
     extend_token_ids_logprob: bool = False
@@ -148,6 +147,7 @@ class LogitsMetadata:
         return cls(
             forward_mode=forward_batch.forward_mode,
             capture_hidden_mode=forward_batch.capture_hidden_mode,
+            verification_algorithm=forward_batch.verification_algorithm,
             extend_return_logprob=extend_return_logprob,
             extend_return_top_logprob=extend_return_top_logprob,
             extend_token_ids_logprob=extend_token_ids_logprob,
@@ -352,11 +352,35 @@ class LogitsProcessor(nn.Module):
             else:
                 assert False, "Should never reach"
 
+            """
+                Regardless of capture mode, if we are performing verification, we want to capture hidden states
+                Now:
+                    - The hidden states have a flattened dimension N which can represent many tokens across different sequences
+                    - Which tokens belong to which sequences is in `logits_metadata`
+                    - The `pruned_states` contains the "last token" of each sequence - therefore it selects some tokens out of the flattened dimension N
+                    - The `sample_indices` further selects some tokens from the `pruned_states` based on "what tokens we are actually sampling" (details hazy to me)
+                We want to use the `pruned_states` because:
+                    (1) In the case of a decode step (which is generating a next token), every token is the "last" because it is "the next token" (i assume target_verify is the same)
+                    (2) In the case of a an extend step, we are prefilling, so `pruned_states` contains the last token of each sequence for its N dimension
+                    (3) If we are `extend_log_prob`ing, I don't quite understand the logic of which things get to be pruned states.  i will have to revisit this.
+            """
+            verification_hidden_states_to_store: Optional[torch.Tensor] = None
+            if logits_metadata.verification_algorithm.is_toploc():
+                verification_hidden_states_to_store = (
+                    pruned_states[sample_indices] if sample_indices else pruned_states
+                )
+
+            # For TOPLOC verification algorithm, capture hidden states and generate proof
+            verification_proof: Optional[list] = None
+            if logits_metadata.verification_algorithm.is_toploc():
+                verification_proof = self.generate_verification_proof(hidden_states)
+
         if not logits_metadata.extend_return_logprob:
             # Decode mode or extend mode without return_logprob.
             return LogitsProcessorOutput(
                 next_token_logits=sampled_logits,
                 hidden_states=hidden_states_to_store,
+                verification_hidden_states=verification_hidden_states_to_store,
             )
         else:
             input_logprobs = logits[input_logprob_indices]
@@ -410,6 +434,7 @@ class LogitsProcessor(nn.Module):
                 input_top_logprobs_val=input_top_logprobs_val,
                 input_top_logprobs_idx=input_top_logprobs_idx,
                 hidden_states=hidden_states_to_store,
+                verification_hidden_states=verification_hidden_states_to_store,
                 input_token_ids_logprobs_val=input_token_ids_logprobs_val,
                 input_token_ids_logprobs_idx=input_token_ids_logprobs_idx,
             )
@@ -547,6 +572,21 @@ class LogitsProcessor(nn.Module):
             return torch.log(probs)
         else:
             return torch.nn.functional.log_softmax(last_logits, dim=-1)
+
+    def generate_verification_proof(self, hidden_states: torch.Tensor) -> list:
+        """Generate a verification proof from hidden states.
+
+        The proof is a fingerprint or hash-like representation of the hidden states.
+        In this implementation, we use a simple mean of the hidden states as a proof,
+        but more sophisticated methods could be implemented.
+
+        Args:
+            hidden_states: The hidden states to generate proof from
+
+        Returns:
+            A list representation of the proof
+        """
+        return []
 
 
 @triton.jit

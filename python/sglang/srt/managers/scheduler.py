@@ -113,6 +113,7 @@ from sglang.srt.utils import (
     set_random_seed,
     suppress_other_loggers,
 )
+from sglang.srt.verification.verification_info import VerificationAlgorithm
 from sglang.utils import TypeBasedDispatcher, get_exception_traceback
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,11 @@ class Scheduler(SchedulerOutputProcessorMixin):
         self.stream_interval = server_args.stream_interval
         self.spec_algorithm = SpeculativeAlgorithm.from_string(
             server_args.speculative_algorithm
+        )
+        self.verification_algorithm = (
+            VerificationAlgorithm.TOPLOC
+            if server_args.toploc_fingerprint
+            else VerificationAlgorithm.NONE
         )
         self.gpu_id = gpu_id
         self.enable_hierarchical_cache = server_args.enable_hierarchical_cache
@@ -1135,6 +1141,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
             self.model_config,
             self.enable_overlap,
             self.spec_algorithm,
+            self.verification_algorithm,
             self.server_args.enable_custom_logit_processor,
         )
         new_batch.prepare_for_extend()
@@ -1366,6 +1373,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
             self.model_config,
             self.enable_overlap,
             self.spec_algorithm,
+            self.verification_algorithm,
             self.server_args.enable_custom_logit_processor,
         )
         idle_batch.prepare_for_idle()

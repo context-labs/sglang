@@ -40,6 +40,7 @@ import triton.language as tl
 
 from sglang.srt.layers.rotary_embedding import MRotaryEmbedding
 from sglang.srt.utils import get_compiler_backend
+from sglang.srt.verification.verification_info import VerificationAlgorithm
 
 if TYPE_CHECKING:
     from sglang.srt.layers.attention.base_attn_backend import AttentionBackend
@@ -217,6 +218,9 @@ class ForwardBatch:
     spec_algorithm: SpeculativeAlgorithm = None
     capture_hidden_mode: CaptureHiddenMode = None
 
+    # Verification algorithm
+    verification_algorithm: VerificationAlgorithm = None
+
     # For padding
     padded_static_len: int = -1  # -1 if not padded
 
@@ -262,6 +266,7 @@ class ForwardBatch:
             capture_hidden_mode=batch.capture_hidden_mode,
             input_embeds=batch.input_embeds,
             extend_input_logprob_token_ids_gpu=extend_input_logprob_token_ids_gpu,
+            verification_algorithm=batch.verification_algorithm,
         )
 
         # For DP attention

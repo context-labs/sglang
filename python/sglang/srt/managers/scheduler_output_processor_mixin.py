@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 from sglang.srt.layers.logits_processor import LogitsProcessorOutput
 from sglang.srt.managers.io_struct import BatchEmbeddingOut, BatchTokenIDOut
 from sglang.srt.managers.schedule_batch import BaseFinishReason, Req, ScheduleBatch
+from sglang.srt.verification.verification_utils import create_toploc_proofs
 
 if TYPE_CHECKING:
     from sglang.srt.managers.scheduler import (
@@ -248,6 +249,13 @@ class SchedulerOutputProcessorMixin:
             if req.return_hidden_states and logits_output.hidden_states is not None:
                 req.hidden_states.append(
                     logits_output.hidden_states[i].cpu().clone().tolist()
+                )
+
+            if logits_output.verification_hidden_states is not None:
+                req.verification_proofs.append(
+                    create_toploc_proofs(
+                        logits_output.verification_hidden_states[i].cpu().clone()
+                    )
                 )
 
             if req.grammar is not None and batch.spec_algorithm.is_none():

@@ -131,6 +131,9 @@ class ModelRunner:
             self.capture_hidden_mode = (
                 CaptureHiddenMode.LAST
             )  # Only capture final hidden state
+            self.verification_algorithm = (
+                VerificationAlgorithm.TOPLOC
+            )  # Set verification algorithm
             self.is_cuda_graph_capturing = (
                 False  # Flag to track CUDA graph capturing state
             )

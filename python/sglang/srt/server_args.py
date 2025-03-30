@@ -186,6 +186,7 @@ class ServerArgs:
     debug_tensor_dump_inject: bool = False
 
     toploc_fingerprint: bool = False
+    toploc_verification_topk: Optional[int] = 128
 
     def __post_init__(self):
         # Set missing default values
@@ -1069,6 +1070,12 @@ class ServerArgs:
             "--toploc-fingerprint",
             action="store_true",
             help="Enable activation saving for TopLoc fingerprinting",
+        )
+        parser.add_argument(
+            "--toploc-verification-topk",
+            type=int,
+            default=128,
+            help="Top-k for TopLoc verification",
         )
 
     @classmethod

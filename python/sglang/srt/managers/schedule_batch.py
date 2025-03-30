@@ -54,6 +54,7 @@ from sglang.srt.utils import get_compiler_backend
 if TYPE_CHECKING:
     from sglang.srt.speculative.eagle_utils import EagleDraftInput, EagleVerifyInput
     from sglang.srt.speculative.spec_info import SpeculativeAlgorithm
+    from sglang.srt.verification.verification_info import VerificationAlgorithm
 
 INIT_INCREMENTAL_DETOKENIZATION_OFFSET = 5
 
@@ -75,6 +76,7 @@ global_server_args_dict = {
     "enable_flashmla": ServerArgs.enable_flashmla,
     "disable_radix_cache": ServerArgs.disable_radix_cache,
     "flashinfer_mla_disable_ragged": ServerArgs.flashinfer_mla_disable_ragged,
+    "toploc_verification_topk": ServerArgs.toploc_verification_topk,
 }
 
 logger = logging.getLogger(__name__)
@@ -267,6 +269,7 @@ class Req:
         session_id: Optional[str] = None,
         custom_logit_processor: Optional[str] = None,
         return_hidden_states: bool = False,
+        return_verification_proofs: bool = False,
         eos_token_ids: Optional[Set[int]] = None,
     ):
         # Input and output info
@@ -607,6 +610,9 @@ class ScheduleBatch:
     spec_algorithm: SpeculativeAlgorithm = None
     spec_info: Optional[Union[EagleDraftInput, EagleVerifyInput]] = None
 
+    # Verification
+    verification_algorithm: VerificationAlgorithm = None
+
     # Enable custom logit processor
     enable_custom_logit_processor: bool = False
 
@@ -623,7 +629,8 @@ class ScheduleBatch:
         model_config: ModelConfig,
         enable_overlap: bool,
         spec_algorithm: SpeculativeAlgorithm,
-        enable_custom_logit_processor: bool,
+        verification_algorithm: VerificationAlgorithm,
+        enable_custom_logit_processor: bool = False,
     ):
         return_logprob = any(req.return_logprob for req in reqs)
 
@@ -639,6 +646,7 @@ class ScheduleBatch:
             has_grammar=any(req.grammar for req in reqs),
             device=req_to_token_pool.device,
             spec_algorithm=spec_algorithm,
+            verification_algorithm=verification_algorithm,
             enable_custom_logit_processor=enable_custom_logit_processor,
             return_hidden_states=any(req.return_hidden_states for req in reqs),
         )
@@ -1342,6 +1350,7 @@ class ScheduleBatch:
             input_embeds=self.input_embeds,
             spec_algorithm=self.spec_algorithm,
             spec_info=self.spec_info,
+            verification_algorithm=self.verification_algorithm,
             capture_hidden_mode=(
                 CaptureHiddenMode.FULL
                 if self.return_hidden_states
@@ -1366,6 +1375,7 @@ class ScheduleBatch:
             return_logprob=self.return_logprob,
             decoding_reqs=self.decoding_reqs,
             spec_algorithm=self.spec_algorithm,
+            verification_algorithm=self.verification_algorithm,
             enable_custom_logit_processor=self.enable_custom_logit_processor,
         )
 
@@ -1435,6 +1445,7 @@ class ModelWorkerBatch:
     # Speculative decoding
     spec_algorithm: SpeculativeAlgorithm = None
     spec_info: Optional[Union[EagleVerifyInput, EagleDraftInput]] = None
+    verification_algorithm: VerificationAlgorithm = None
     # If set, the output of the batch contains the hidden states of the run.
     capture_hidden_mode: CaptureHiddenMode = None
 
