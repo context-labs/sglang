@@ -115,6 +115,24 @@ class SchedulerOutputProcessorMixin:
                             .tolist()
                         )
 
+                    if (
+                        req.return_verification_proofs
+                        and logits_output.verification_hidden_states is not None
+                    ):
+                        # Process verification hidden states for the current request
+                        req.verification_proofs.append(
+                            create_toploc_proofs(
+                                logits_output.verification_hidden_states[
+                                    hidden_state_offset : (
+                                        hidden_state_offset := hidden_state_offset
+                                        + len(req.origin_input_ids)
+                                    )
+                                ]
+                                .cpu()
+                                .clone()
+                            )
+                        )
+
                     if req.grammar is not None:
                         req.grammar.accept_token(next_token_id)
                         req.grammar.finished = req.finished()
@@ -471,6 +489,7 @@ class SchedulerOutputProcessorMixin:
         cached_tokens = []
         spec_verify_ct = []
         output_hidden_states = None
+        verification_proofs = None
 
         if return_logprob:
             input_token_logprobs_val = []
@@ -566,6 +585,14 @@ class SchedulerOutputProcessorMixin:
                         output_hidden_states = []
                     output_hidden_states.append(req.hidden_states)
 
+                # Collect verification proofs if requested
+                if req.return_verification_proofs and hasattr(
+                    req, "verification_proofs"
+                ):
+                    if verification_proofs is None:
+                        verification_proofs = []
+                    verification_proofs.append(req.verification_proofs)
+
         # Send to detokenizer
         if rids:
             if self.model_config.is_multimodal_gen:
@@ -598,6 +625,7 @@ class SchedulerOutputProcessorMixin:
                     output_token_ids_logprobs_val,
                     output_token_ids_logprobs_idx,
                     output_hidden_states,
+                    verification_proofs,
                 )
             )
 

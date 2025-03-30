@@ -638,7 +638,7 @@ def v1_generate_response(request, ret, tokenizer_manager, to_file=False):
         finish_reason = ret_item["meta_info"]["finish_reason"]
 
         if to_file:
-            # to make the choise data json serializable
+            # to make the choice data json serializable
             choice_data = {
                 "index": 0,
                 "text": text,
@@ -731,32 +731,6 @@ async def v1_completions(tokenizer_manager, raw_request: Request):
                     text = content["text"]
                     prompt_tokens[index] = content["meta_info"]["prompt_tokens"]
                     completion_tokens[index] = content["meta_info"]["completion_tokens"]
-
-                    if not stream_buffer:  # The first chunk
-                        if request.echo:
-                            if isinstance(request.prompt, str):
-                                # for the case of single str prompts
-                                prompts = request.prompt
-                            elif isinstance(request.prompt, list):
-                                if isinstance(request.prompt[0], str):
-                                    # for the case of multiple str prompts
-                                    prompts = request.prompt[index // request.n]
-                                elif isinstance(request.prompt[0], int):
-                                    # for the case of single token ids prompt
-                                    prompts = tokenizer_manager.tokenizer.decode(
-                                        request.prompt, skip_special_tokens=True
-                                    )
-                                elif isinstance(request.prompt[0], list) and isinstance(
-                                    request.prompt[0][0], int
-                                ):
-                                    # for the case of multiple token ids prompts
-                                    prompts = tokenizer_manager.tokenizer.decode(
-                                        request.prompt[index // request.n],
-                                        skip_special_tokens=True,
-                                    )
-
-                            # Prepend prompt in response text.
-                            text = prompts + text
 
                     if request.logprobs is not None:
                         # The first chunk and echo is enabled.
@@ -1096,9 +1070,6 @@ def v1_chat_generate_response(
 
         finish_reason = ret_item["meta_info"]["finish_reason"]
 
-        tool_calls = None
-        text = ret_item["text"]
-
         if isinstance(request, list):
             tool_choice = request[idx].tool_choice
             tools = request[idx].tools
@@ -1113,7 +1084,7 @@ def v1_chat_generate_response(
                 parser = ReasoningParser(
                     model_type=reasoning_parser, stream_reasoning=False
                 )
-                reasoning_text, text = parser.parse_non_stream(text)
+                reasoning_text, text = parser.parse_non_stream(ret_item["text"])
             except Exception as e:
                 logger.error(f"Exception: {e}")
                 return create_error_response(
@@ -1122,8 +1093,10 @@ def v1_chat_generate_response(
                 )
         else:
             reasoning_text = None
+            text = ret_item["text"]
 
-        if tool_choice != "none" and tools:
+        tool_calls = None
+        if tool_call_parser and tool_choice != "none" and tools:
             parser = FunctionCallParser(tools, tool_call_parser)
             if parser.has_tool_call(text):
                 if finish_reason["type"] == "stop":
@@ -1147,6 +1120,9 @@ def v1_chat_generate_response(
                         "Failed to parse fc related info to json format!",
                     )
 
+        # Extract verification proofs if available
+        verification_proofs = ret_item["meta_info"].get("verification_proofs", None)
+
         if to_file:
             # to make the choice data json serializable
             choice_data = {
@@ -1156,6 +1132,9 @@ def v1_chat_generate_response(
                     "content": text if text else None,
                     "tool_calls": tool_calls,
                     "reasoning_content": reasoning_text if reasoning_text else None,
+                    "verification_proofs": (
+                        verification_proofs if verification_proofs else None
+                    ),
                 },
                 "logprobs": choice_logprobs.model_dump() if choice_logprobs else None,
                 "finish_reason": (finish_reason["type"] if finish_reason else ""),
@@ -1173,6 +1152,9 @@ def v1_chat_generate_response(
                     content=text if text else None,
                     tool_calls=tool_calls,
                     reasoning_content=reasoning_text if reasoning_text else None,
+                    verification_proofs=(
+                        verification_proofs if verification_proofs else None
+                    ),
                 ),
                 logprobs=choice_logprobs,
                 finish_reason=(finish_reason["type"] if finish_reason else ""),
@@ -1387,11 +1369,18 @@ async def v1_chat_completions(tokenizer_manager, raw_request: Request):
                             is_firsts[index] = is_first
                             continue
 
-                    if request.tool_choice != "none" and request.tools:
+                    if isinstance(request, list):
+                        tool_choice = request[index].tool_choice
+                        tools = request[index].tools
+                    else:
+                        tool_choice = request.tool_choice
+                        tools = request.tools
+
+                    if tool_call_parser and tool_choice != "none" and tools:
                         if index not in parser_dict:
                             parser_dict[index] = FunctionCallParser(
-                                tools=request.tools,
-                                tool_call_parser=tokenizer_manager.server_args.tool_call_parser,
+                                tools=tools,
+                                tool_call_parser=tool_call_parser,
                             )
                         parser = parser_dict[index]
 
@@ -1451,8 +1440,7 @@ async def v1_chat_completions(tokenizer_manager, raw_request: Request):
                             tool_call = ToolCall(
                                 id=str(call_item.tool_index),
                                 function=FunctionResponse(
-                                    name=call_item.name,
-                                    arguments=call_item.parameters,
+                                    name=call_item.name, arguments=call_item.parameters
                                 ),
                             )
                             choice_data = ChatCompletionResponseStreamChoice(

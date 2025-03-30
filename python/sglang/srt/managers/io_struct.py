@@ -428,6 +428,9 @@ class BatchTokenIDOut:
     # Hidden states
     output_hidden_states: List[List[float]]
 
+    # Verification proofs
+    verification_proofs: List[List] = None
+
 
 @dataclass
 class BatchMultimodalDecodeReq:
@@ -474,6 +477,7 @@ class BatchStrOut:
 
     # Hidden states
     output_hidden_states: List[List[float]]
+    verification_proofs: List[List] = None
 
 
 @dataclass

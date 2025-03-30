@@ -19,14 +19,15 @@ def create_toploc_proofs(
         The hidden states tensor moved to CPU or None if input was None
     """
 
-    # Move to CPU and keep the gradient disconnected for memory efficiency
+    # Move to CPU . Will have size [N,hidden] - each one should represent a "last token"
     verification_hidden_states = verification_hidden_states.detach().cpu()
 
     topk = global_server_args_dict["toploc_verification_topk"]
 
-    build_proofs_base64(
+    # Will return N proofs
+    return build_proofs_base64(
         verification_hidden_states,
-        decode_batching_size=1,
+        decode_batching_size=3,
         topk=topk,
         skip_prefill=False,
     )

@@ -297,6 +297,10 @@ class Req:
         self.sampling_params = sampling_params
         self.custom_logit_processor = custom_logit_processor
         self.return_hidden_states = return_hidden_states
+        self.return_verification_proofs = return_verification_proofs
+
+        # For storing verification proofs
+        self.verification_proofs = []
 
         # Memory pool info
         self.req_pool_idx: Optional[int] = None
