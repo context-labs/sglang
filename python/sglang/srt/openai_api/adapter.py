@@ -638,7 +638,7 @@ def v1_generate_response(request, ret, tokenizer_manager, to_file=False):
         finish_reason = ret_item["meta_info"]["finish_reason"]
 
         if to_file:
-            # to make the choice data json serializable
+            # to make the choise data json serializable
             choice_data = {
                 "index": 0,
                 "text": text,
@@ -1402,18 +1402,11 @@ async def v1_chat_completions(tokenizer_manager, raw_request: Request):
                             is_firsts[index] = is_first
                             continue
 
-                    if isinstance(request, list):
-                        tool_choice = request[index].tool_choice
-                        tools = request[index].tools
-                    else:
-                        tool_choice = request.tool_choice
-                        tools = request.tools
-
-                    if tool_call_parser and tool_choice != "none" and tools:
+                    if request.tool_choice != "none" and request.tools:
                         if index not in parser_dict:
                             parser_dict[index] = FunctionCallParser(
-                                tools=tools,
-                                tool_call_parser=tool_call_parser,
+                                tools=request.tools,
+                                tool_call_parser=tokenizer_manager.server_args.tool_call_parser,
                             )
                         parser = parser_dict[index]
 
@@ -1473,7 +1466,8 @@ async def v1_chat_completions(tokenizer_manager, raw_request: Request):
                             tool_call = ToolCall(
                                 id=str(call_item.tool_index),
                                 function=FunctionResponse(
-                                    name=call_item.name, arguments=call_item.parameters
+                                    name=call_item.name,
+                                    arguments=call_item.parameters,
                                 ),
                             )
                             choice_data = ChatCompletionResponseStreamChoice(
