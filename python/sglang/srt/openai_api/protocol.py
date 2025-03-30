@@ -347,7 +347,6 @@ class ChatCompletionRequest(BaseModel):
     session_params: Optional[Dict] = None
     separate_reasoning: bool = True
     stream_reasoning: bool = True
-    return_verification_proofs: bool = False
 
 
 class FunctionResponse(BaseModel):

@@ -77,6 +77,7 @@ global_server_args_dict = {
     "disable_radix_cache": ServerArgs.disable_radix_cache,
     "flashinfer_mla_disable_ragged": ServerArgs.flashinfer_mla_disable_ragged,
     "toploc_verification_topk": ServerArgs.toploc_verification_topk,
+    "toploc_fingerprint": ServerArgs.toploc_fingerprint,
 }
 
 logger = logging.getLogger(__name__)
@@ -269,7 +270,6 @@ class Req:
         session_id: Optional[str] = None,
         custom_logit_processor: Optional[str] = None,
         return_hidden_states: bool = False,
-        return_verification_proofs: bool = False,
         eos_token_ids: Optional[Set[int]] = None,
     ):
         # Input and output info
@@ -297,10 +297,6 @@ class Req:
         self.sampling_params = sampling_params
         self.custom_logit_processor = custom_logit_processor
         self.return_hidden_states = return_hidden_states
-        self.return_verification_proofs = return_verification_proofs
-
-        # For storing verification proofs
-        self.verification_proofs = []
 
         # Memory pool info
         self.req_pool_idx: Optional[int] = None
@@ -402,6 +398,9 @@ class Req:
         # This is used to compute the average acceptance length per request.
         self.spec_verify_ct = 0
         self.lora_path = lora_path
+
+        # For storing verification proofs
+        self.verification_proofs = []
 
     @property
     def seqlen(self):
@@ -1336,9 +1335,9 @@ class ScheduleBatch:
             )
         )
 
-        # Ensure CAPTURE_HIDDEN_MODE is *at least* LAST if return_verification_proofs is set
+        # Ensure CAPTURE_HIDDEN_MODE is *at least* LAST if toploc fingerprinting is enabled
         if (
-            any(req.return_verification_proofs for req in self.reqs)
+            global_server_args_dict["toploc_fingerprint"]
             and capture_hidden_mode == CaptureHiddenMode.NULL
         ):
             capture_hidden_mode = CaptureHiddenMode.LAST

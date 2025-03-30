@@ -118,13 +118,10 @@ class SchedulerOutputProcessorMixin:
                             .tolist()
                         )
 
-                    if (
-                        req.return_verification_proofs
-                        and logits_output.verification_hidden_states is not None
-                    ):
+                    if logits_output.verification_hidden_states is not None:
                         # Process verification hidden states for the current request
                         logger.debug(
-                            f"Processing verification hidden states for prefill in req {req.req_id}"
+                            f"Processing verification hidden states for prefill in req {req}"
                         )
                         req.verification_proofs.append(
                             create_toploc_proofs(
@@ -139,7 +136,11 @@ class SchedulerOutputProcessorMixin:
                             )
                         )
                         logger.debug(
-                            f"Added verification proof #{len(req.verification_proofs)} to req {req.req_id} (prefill)"
+                            f"Added verification proof #{len(req.verification_proofs)} to req (prefill)"
+                        )
+                    else:
+                        logger.debug(
+                            "No verification hidden states to process into proofs when prefilling"
                         )
 
                     if req.grammar is not None:
@@ -279,16 +280,18 @@ class SchedulerOutputProcessorMixin:
                 )
 
             if logits_output.verification_hidden_states is not None:
-                logger.debug(
-                    f"Processing verification hidden states for decode in req {req.req_id}"
-                )
+                logger.debug(f"Processing verification hidden states for decode in req")
                 req.verification_proofs.append(
                     create_toploc_proofs(
                         logits_output.verification_hidden_states[i].cpu().clone()
                     )
                 )
                 logger.debug(
-                    f"Added verification proof #{len(req.verification_proofs)} to req {req.req_id} (decode)"
+                    f"Added verification proof #{len(req.verification_proofs)} to req (decode)"
+                )
+            else:
+                logger.debug(
+                    "No verification hidden states to process into proofs when decoding"
                 )
 
             if req.grammar is not None and batch.spec_algorithm.is_none():
@@ -601,11 +604,9 @@ class SchedulerOutputProcessorMixin:
                     output_hidden_states.append(req.hidden_states)
 
                 # Collect verification proofs if requested
-                if req.return_verification_proofs and hasattr(
-                    req, "verification_proofs"
-                ):
+                if hasattr(req, "verification_proofs"):
                     logger.debug(
-                        f"Collecting verification proofs for req {req.req_id}: {len(req.verification_proofs) if req.verification_proofs else 0} proofs"
+                        f"Collecting verification proofs for req {req}: {len(req.verification_proofs) if req.verification_proofs else 0} proofs"
                     )
                     if verification_proofs is None:
                         verification_proofs = []

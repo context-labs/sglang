@@ -35,13 +35,15 @@ def create_toploc_proofs(
     verification_hidden_states = verification_hidden_states.detach().cpu()
 
     topk = global_server_args_dict["toploc_verification_topk"]
-    logger.debug(f"Using TopLoc verification topk={topk}")
+    logger.debug(
+        f"Using TopLoc verification topk={topk}, tensor: {verification_hidden_states.shape}"
+    )
 
     # Will return N proofs
     try:
         proofs = build_proofs_base64(
-            verification_hidden_states,
-            decode_batching_size=3,
+            [verification_hidden_states],
+            decode_batching_size=1,
             topk=topk,
             skip_prefill=False,
         )

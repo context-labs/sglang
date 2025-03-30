@@ -876,7 +876,6 @@ def v1_chat_generate_request(
     top_logprobs_nums = []
     modalities_list = []
     lora_paths = []
-    return_verification_proofs = False
 
     # NOTE: with openai API, the prompt's logprobs are always not computed
 
@@ -973,8 +972,6 @@ def v1_chat_generate_request(
         logprob_start_lens.append(-1)
         top_logprobs_nums.append(request.top_logprobs or 0)
         lora_paths.append(request.lora_path)
-        if getattr(request, "return_verification_proofs", False):
-            return_verification_proofs = True
 
         sampling_params = {
             "temperature": request.temperature,
@@ -1040,7 +1037,6 @@ def v1_chat_generate_request(
         rid=request_ids,
         modalities=modalities_list,
         lora_path=lora_paths,
-        return_verification_proofs=return_verification_proofs,
     )
 
     return adapted_request, all_requests if len(all_requests) > 1 else all_requests[0]

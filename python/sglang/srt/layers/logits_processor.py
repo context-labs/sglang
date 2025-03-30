@@ -389,6 +389,16 @@ class LogitsProcessor(nn.Module):
 
         if not logits_metadata.extend_return_logprob:
             # Decode mode or extend mode without return_logprob.
+
+            if verification_hidden_states_to_store is not None:
+                logger.debug(
+                    f"(A) Returning logits processor output with verification hidden states: {verification_hidden_states_to_store.shape}"
+                )
+            else:
+                logger.debug(
+                    "(A) Returning logits processor output without verification hidden states"
+                )
+
             return LogitsProcessorOutput(
                 next_token_logits=sampled_logits,
                 hidden_states=hidden_states_to_store,
@@ -439,6 +449,15 @@ class LogitsProcessor(nn.Module):
                 torch.arange(input_logprobs.shape[0], device=input_logprobs.device),
                 logits_metadata.extend_input_logprob_token_ids_gpu,
             ]
+
+            if verification_hidden_states_to_store is not None:
+                logger.debug(
+                    f"(B) Returning logits processor output with verification hidden states: {verification_hidden_states_to_store.shape}"
+                )
+            else:
+                logger.debug(
+                    "(B) Returning logits processor output without verification hidden states"
+                )
 
             return LogitsProcessorOutput(
                 next_token_logits=sampled_logits,

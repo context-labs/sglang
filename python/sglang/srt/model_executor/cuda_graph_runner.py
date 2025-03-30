@@ -29,6 +29,7 @@ from sglang.srt.distributed.parallel_state import GroupCoordinator, graph_captur
 from sglang.srt.layers.logits_processor import LogitsProcessorOutput
 from sglang.srt.layers.moe.fused_moe_native import fused_moe_forward_native
 from sglang.srt.layers.torchao_utils import save_gemlite_cache
+from sglang.srt.managers.schedule_batch import global_server_args_dict
 from sglang.srt.model_executor.forward_batch_info import (
     CaptureHiddenMode,
     ForwardBatch,
@@ -40,6 +41,10 @@ _is_hip = is_hip()
 
 if TYPE_CHECKING:
     from sglang.srt.model_executor.model_runner import ModelRunner
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _to_torch(model: torch.nn.Module, reverse: bool, num_tokens: int):
@@ -181,7 +186,14 @@ class CudaGraphRunner:
         # Batch sizes to capture
         self.capture_bs, self.compile_bs = get_batch_sizes_to_capture(model_runner)
         self.capture_forward_mode = ForwardMode.DECODE
-        self.capture_hidden_mode = CaptureHiddenMode.NULL
+
+        # Set capture_hidden_mode based on speculative decoding and toploc fingerprinting
+        if model_runner.server_args.toploc_fingerprint:
+            # When toploc fingerprinting is enabled, we need at least LAST mode
+            self.capture_hidden_mode = CaptureHiddenMode.LAST
+        else:
+            self.capture_hidden_mode = CaptureHiddenMode.NULL
+
         self.num_tokens_per_bs = 1
         if model_runner.spec_algorithm.is_eagle():
             if self.model_runner.is_draft_worker:
@@ -240,11 +252,10 @@ class CudaGraphRunner:
 
             # Check if toploc verification is enabled via server args directly
             if self.model_runner.server_args.toploc_fingerprint:
-                self.verification_hidden_states = torch.zeros(
-                    (1, self.model_runner.model_config.hidden_size),
+                self.hidden_states = torch.zeros(
+                    (self.max_num_token, self.model_runner.model_config.hidden_size),
                     dtype=self.model_runner.dtype,
                 )
-                self.verification_proof = None
 
             if self.is_encoder_decoder:
                 # NOTE: encoder_lens can influence the full_text_row_masked_out_mask tensor when doing mixed batch
@@ -322,6 +333,9 @@ class CudaGraphRunner:
         return is_bs_supported and is_encoder_lens_supported
 
     def capture(self):
+        logger.debug(
+            f"Capturing graph in cuda_graph_runner with hidden capture code: {self.capture_hidden_mode}"
+        )
         with graph_capture() as graph_capture_context:
             self.stream = graph_capture_context.stream
             avail_mem = get_available_gpu_memory(
@@ -400,6 +414,13 @@ class CudaGraphRunner:
                 spec_info.capture_hidden_mode if spec_info else CaptureHiddenMode.NULL
             )
 
+        if (
+            self.capture_hidden_mode == CaptureHiddenMode.NULL
+            and self.model_runner.server_args.toploc_fingerprint
+        ):
+            logger.debug("Setting capture_hidden_mode to LAST in cuda_graph_runner")
+            self.capture_hidden_mode = CaptureHiddenMode.LAST
+
         forward_batch = ForwardBatch(
             forward_mode=self.capture_forward_mode,
             batch_size=bs,
@@ -455,6 +476,8 @@ class CudaGraphRunner:
         return graph, out
 
     def recapture_if_needed(self, forward_batch: ForwardBatch):
+        logger.debug("Recapturing graph in cuda_graph_runner")
+
         # If the capture_hidden_mode changes, we need to recapture the graph
         hidden_mode_from_spec_info = getattr(
             forward_batch.spec_info, "capture_hidden_mode", CaptureHiddenMode.NULL
@@ -545,6 +568,15 @@ class CudaGraphRunner:
         hidden_states = (
             hidden_states[: self.raw_num_token] if hidden_states is not None else None
         )
+
+        if hidden_states is not None:
+            logger.debug(
+                f"(C) Returning logits processor output with verification hidden states: {hidden_states.shape}"
+            )
+        else:
+            logger.debug(
+                "(C) Returning logits processor output without verification hidden states"
+            )
 
         logits_output = LogitsProcessorOutput(
             next_token_logits=next_token_logits[: self.raw_num_token],
