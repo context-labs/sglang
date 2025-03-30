@@ -366,14 +366,12 @@ class LogitsProcessor(nn.Module):
             """
             verification_hidden_states_to_store: Optional[torch.Tensor] = None
             if logits_metadata.verification_algorithm.is_toploc():
+                logger.debug(
+                    f"Capturing TopLoc verification hidden states with shape {pruned_states.shape if pruned_states is not None else 'None'}"
+                )
                 verification_hidden_states_to_store = (
                     pruned_states[sample_indices] if sample_indices else pruned_states
                 )
-
-            # For TOPLOC verification algorithm, capture hidden states and generate proof
-            verification_proof: Optional[list] = None
-            if logits_metadata.verification_algorithm.is_toploc():
-                verification_proof = self.generate_verification_proof(hidden_states)
 
         if not logits_metadata.extend_return_logprob:
             # Decode mode or extend mode without return_logprob.
@@ -572,21 +570,6 @@ class LogitsProcessor(nn.Module):
             return torch.log(probs)
         else:
             return torch.nn.functional.log_softmax(last_logits, dim=-1)
-
-    def generate_verification_proof(self, hidden_states: torch.Tensor) -> list:
-        """Generate a verification proof from hidden states.
-
-        The proof is a fingerprint or hash-like representation of the hidden states.
-        In this implementation, we use a simple mean of the hidden states as a proof,
-        but more sophisticated methods could be implemented.
-
-        Args:
-            hidden_states: The hidden states to generate proof from
-
-        Returns:
-            A list representation of the proof
-        """
-        return []
 
 
 @triton.jit

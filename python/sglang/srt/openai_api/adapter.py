@@ -732,6 +732,32 @@ async def v1_completions(tokenizer_manager, raw_request: Request):
                     prompt_tokens[index] = content["meta_info"]["prompt_tokens"]
                     completion_tokens[index] = content["meta_info"]["completion_tokens"]
 
+                    if not stream_buffer:  # The first chunk
+                        if request.echo:
+                            if isinstance(request.prompt, str):
+                                # for the case of single str prompts
+                                prompts = request.prompt
+                            elif isinstance(request.prompt, list):
+                                if isinstance(request.prompt[0], str):
+                                    # for the case of multiple str prompts
+                                    prompts = request.prompt[index // request.n]
+                                elif isinstance(request.prompt[0], int):
+                                    # for the case of single token ids prompt
+                                    prompts = tokenizer_manager.tokenizer.decode(
+                                        request.prompt, skip_special_tokens=True
+                                    )
+                                elif isinstance(request.prompt[0], list) and isinstance(
+                                    request.prompt[0][0], int
+                                ):
+                                    # for the case of multiple token ids prompts
+                                    prompts = tokenizer_manager.tokenizer.decode(
+                                        request.prompt[index // request.n],
+                                        skip_special_tokens=True,
+                                    )
+
+                            # Prepend prompt in response text.
+                            text = prompts + text
+
                     if request.logprobs is not None:
                         # The first chunk and echo is enabled.
                         if not stream_buffer and request.echo:
@@ -1070,6 +1096,9 @@ def v1_chat_generate_response(
 
         finish_reason = ret_item["meta_info"]["finish_reason"]
 
+        tool_calls = None
+        text = ret_item["text"]
+
         if isinstance(request, list):
             tool_choice = request[idx].tool_choice
             tools = request[idx].tools
@@ -1084,7 +1113,7 @@ def v1_chat_generate_response(
                 parser = ReasoningParser(
                     model_type=reasoning_parser, stream_reasoning=False
                 )
-                reasoning_text, text = parser.parse_non_stream(ret_item["text"])
+                reasoning_text, text = parser.parse_non_stream(text)
             except Exception as e:
                 logger.error(f"Exception: {e}")
                 return create_error_response(
@@ -1093,10 +1122,8 @@ def v1_chat_generate_response(
                 )
         else:
             reasoning_text = None
-            text = ret_item["text"]
 
-        tool_calls = None
-        if tool_call_parser and tool_choice != "none" and tools:
+        if tool_choice != "none" and tools:
             parser = FunctionCallParser(tools, tool_call_parser)
             if parser.has_tool_call(text):
                 if finish_reason["type"] == "stop":
@@ -1122,6 +1149,12 @@ def v1_chat_generate_response(
 
         # Extract verification proofs if available
         verification_proofs = ret_item["meta_info"].get("verification_proofs", None)
+        if verification_proofs:
+            logger.debug(
+                f"Retrieved verification proofs from response: {len(verification_proofs)} proof sets"
+            )
+        else:
+            logger.debug("No verification proofs found in response")
 
         if to_file:
             # to make the choice data json serializable

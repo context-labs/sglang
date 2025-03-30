@@ -18,14 +18,12 @@ import gc
 import json
 import logging
 import os
-import threading
 import time
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
 import torch
 import torch.distributed as dist
-from toploc import build_proofs_base64
 
 from sglang.srt.configs.device_config import DeviceConfig
 from sglang.srt.configs.load_config import LoadConfig
@@ -57,7 +55,7 @@ from sglang.srt.mem_cache.memory_pool import (
 )
 from sglang.srt.mem_cache.paged_allocator import PagedTokenToKVPoolAllocator
 from sglang.srt.model_executor.cuda_graph_runner import CudaGraphRunner
-from sglang.srt.model_executor.forward_batch_info import CaptureHiddenMode, ForwardBatch
+from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 from sglang.srt.model_loader import get_model
 from sglang.srt.model_loader.loader import (
     DefaultModelLoader,
@@ -124,19 +122,6 @@ class ModelRunner:
         self.page_size = server_args.page_size
         self.req_to_token_pool = req_to_token_pool
         self.token_to_kv_pool_allocator = token_to_kv_pool_allocator
-
-        # Activation saving setup
-        self.save_activations = server_args.toploc_fingerprint
-        if self.save_activations:
-            self.capture_hidden_mode = (
-                CaptureHiddenMode.LAST
-            )  # Only capture final hidden state
-            self.verification_algorithm = (
-                VerificationAlgorithm.TOPLOC
-            )  # Set verification algorithm
-            self.is_cuda_graph_capturing = (
-                False  # Flag to track CUDA graph capturing state
-            )
 
         # Model-specific adjustment
         self.model_specific_adjustment()
@@ -921,9 +906,7 @@ class ModelRunner:
         logger.info(
             f"Capture cuda graph begin. This can take up to several minutes. avail mem={before_mem:.2f} GB"
         )
-
         self.cuda_graph_runner = CudaGraphRunner(self)
-
         after_mem = get_available_gpu_memory(self.device, self.gpu_id)
         logger.info(
             f"Capture cuda graph end. Time elapsed: {time.time() - tic:.2f} s. "
@@ -978,8 +961,6 @@ class ModelRunner:
     def forward(
         self, forward_batch: ForwardBatch, skip_attn_backend_init: bool = False
     ) -> LogitsProcessorOutput:
-        """Run the forward pass."""
-        # Run cuda graph if possible
         if (
             forward_batch.forward_mode.is_cuda_graph()
             and self.cuda_graph_runner

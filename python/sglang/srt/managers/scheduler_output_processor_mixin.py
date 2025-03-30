@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 from sglang.srt.layers.logits_processor import LogitsProcessorOutput
@@ -13,6 +14,8 @@ if TYPE_CHECKING:
         GenerationBatchResult,
         ScheduleBatch,
     )
+
+logger = logging.getLogger(__name__)
 
 
 class SchedulerOutputProcessorMixin:
@@ -120,6 +123,9 @@ class SchedulerOutputProcessorMixin:
                         and logits_output.verification_hidden_states is not None
                     ):
                         # Process verification hidden states for the current request
+                        logger.debug(
+                            f"Processing verification hidden states for prefill in req {req.req_id}"
+                        )
                         req.verification_proofs.append(
                             create_toploc_proofs(
                                 logits_output.verification_hidden_states[
@@ -131,6 +137,9 @@ class SchedulerOutputProcessorMixin:
                                 .cpu()
                                 .clone()
                             )
+                        )
+                        logger.debug(
+                            f"Added verification proof #{len(req.verification_proofs)} to req {req.req_id} (prefill)"
                         )
 
                     if req.grammar is not None:
@@ -270,10 +279,16 @@ class SchedulerOutputProcessorMixin:
                 )
 
             if logits_output.verification_hidden_states is not None:
+                logger.debug(
+                    f"Processing verification hidden states for decode in req {req.req_id}"
+                )
                 req.verification_proofs.append(
                     create_toploc_proofs(
                         logits_output.verification_hidden_states[i].cpu().clone()
                     )
+                )
+                logger.debug(
+                    f"Added verification proof #{len(req.verification_proofs)} to req {req.req_id} (decode)"
                 )
 
             if req.grammar is not None and batch.spec_algorithm.is_none():
@@ -589,6 +604,9 @@ class SchedulerOutputProcessorMixin:
                 if req.return_verification_proofs and hasattr(
                     req, "verification_proofs"
                 ):
+                    logger.debug(
+                        f"Collecting verification proofs for req {req.req_id}: {len(req.verification_proofs) if req.verification_proofs else 0} proofs"
+                    )
                     if verification_proofs is None:
                         verification_proofs = []
                     verification_proofs.append(req.verification_proofs)

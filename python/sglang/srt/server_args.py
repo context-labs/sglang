@@ -1134,6 +1134,10 @@ def prepare_server_args(argv: List[str]) -> ServerArgs:
     ServerArgs.add_cli_args(parser)
     raw_args = parser.parse_args(argv)
     server_args = ServerArgs.from_cli_args(raw_args)
+    if server_args.toploc_fingerprint:
+        logger.info(
+            f"TopLoc fingerprint verification enabled with topk={server_args.toploc_verification_topk}"
+        )
     return server_args
 
 
