@@ -81,6 +81,9 @@ class GenerateReqInput:
     # Whether to return hidden states
     return_hidden_states: bool = False
 
+    # Whether to return verification proofs
+    return_verification_proofs: bool = False
+
     def normalize_batch_and_arguments(self):
         if (
             self.text is None and self.input_ids is None and self.input_embeds is None
@@ -248,6 +251,7 @@ class GenerateReqInput:
                 else None
             ),
             return_hidden_states=self.return_hidden_states,
+            return_verification_proofs=self.return_verification_proofs,
         )
 
 

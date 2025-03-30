@@ -39,6 +39,7 @@ from sglang.srt.model_executor.forward_batch_info import (
     CaptureHiddenMode,
     ForwardBatch,
     ForwardMode,
+    VerificationAlgorithm,
 )
 from sglang.srt.utils import dump_to_file
 from sglang.srt.verification.verification_info import VerificationAlgorithm
@@ -194,6 +195,19 @@ class LogitsMetadata:
         self.dp_local_start_pos = dp_local_start_pos
         self.dp_local_num_tokens = dp_local_num_tokens
         self.gathered_buffer = gathered_buffer
+
+    def is_toploc_enabled(self) -> bool:
+        """Check if TopLoc verification is enabled either through algorithm or server args"""
+        # First check the verification algorithm attribute
+        if (
+            hasattr(self, "verification_algorithm")
+            and self.verification_algorithm
+            and self.verification_algorithm.is_toploc()
+        ):
+            return True
+
+        # Fallback to checking the global server args
+        return global_server_args_dict.get("toploc_fingerprint", False)
 
 
 class LogitsProcessor(nn.Module):
@@ -352,26 +366,26 @@ class LogitsProcessor(nn.Module):
             else:
                 assert False, "Should never reach"
 
-            """
-                Regardless of capture mode, if we are performing verification, we want to capture hidden states
-                Now:
-                    - The hidden states have a flattened dimension N which can represent many tokens across different sequences
-                    - Which tokens belong to which sequences is in `logits_metadata`
-                    - The `pruned_states` contains the "last token" of each sequence - therefore it selects some tokens out of the flattened dimension N
-                    - The `sample_indices` further selects some tokens from the `pruned_states` based on "what tokens we are actually sampling" (details hazy to me)
-                We want to use the `pruned_states` because:
-                    (1) In the case of a decode step (which is generating a next token), every token is the "last" because it is "the next token" (i assume target_verify is the same)
-                    (2) In the case of a an extend step, we are prefilling, so `pruned_states` contains the last token of each sequence for its N dimension
-                    (3) If we are `extend_log_prob`ing, I don't quite understand the logic of which things get to be pruned states.  i will have to revisit this.
-            """
-            verification_hidden_states_to_store: Optional[torch.Tensor] = None
-            if logits_metadata.verification_algorithm.is_toploc():
-                logger.debug(
-                    f"Capturing TopLoc verification hidden states with shape {pruned_states.shape if pruned_states is not None else 'None'}"
-                )
-                verification_hidden_states_to_store = (
-                    pruned_states[sample_indices] if sample_indices else pruned_states
-                )
+        """
+            Regardless of capture mode, if we are performing verification, we want to capture hidden states
+            Now:
+                - The hidden states have a flattened dimension N which can represent many tokens across different sequences
+                - Which tokens belong to which sequences is in `logits_metadata`
+                - The `pruned_states` contains the "last token" of each sequence - therefore it selects some tokens out of the flattened dimension N
+                - The `sample_indices` further selects some tokens from the `pruned_states` based on "what tokens we are actually sampling" (details hazy to me)
+            We want to use the `pruned_states` because:
+                (1) In the case of a decode step (which is generating a next token), every token is the "last" because it is "the next token" (i assume target_verify is the same)
+                (2) In the case of a an extend step, we are prefilling, so `pruned_states` contains the last token of each sequence for its N dimension
+                (3) If we are `extend_log_prob`ing, I don't quite understand the logic of which things get to be pruned states.  i will have to revisit this.
+        """
+        verification_hidden_states_to_store: Optional[torch.Tensor] = None
+        if logits_metadata.is_toploc_enabled():
+            logger.debug(
+                f"Capturing TopLoc verification hidden states with shape {pruned_states.shape if pruned_states is not None else 'None'}"
+            )
+            verification_hidden_states_to_store = (
+                pruned_states[sample_indices] if sample_indices else pruned_states
+            )
 
         if not logits_metadata.extend_return_logprob:
             # Decode mode or extend mode without return_logprob.

@@ -1325,6 +1325,24 @@ class ScheduleBatch:
 
         global bid
         bid += 1
+
+        capture_hidden_mode = (
+            CaptureHiddenMode.FULL
+            if self.return_hidden_states
+            else (
+                getattr(self.spec_info, "capture_hidden_mode", CaptureHiddenMode.NULL)
+                if self.spec_info
+                else CaptureHiddenMode.NULL
+            )
+        )
+
+        # Ensure CAPTURE_HIDDEN_MODE is *at least* LAST if return_verification_proofs is set
+        if (
+            any(req.return_verification_proofs for req in self.reqs)
+            and capture_hidden_mode == CaptureHiddenMode.NULL
+        ):
+            capture_hidden_mode = CaptureHiddenMode.LAST
+
         return ModelWorkerBatch(
             bid=bid,
             forward_mode=self.forward_mode,
@@ -1355,17 +1373,7 @@ class ScheduleBatch:
             spec_algorithm=self.spec_algorithm,
             spec_info=self.spec_info,
             verification_algorithm=self.verification_algorithm,
-            capture_hidden_mode=(
-                CaptureHiddenMode.FULL
-                if self.return_hidden_states
-                else (
-                    getattr(
-                        self.spec_info, "capture_hidden_mode", CaptureHiddenMode.NULL
-                    )
-                    if self.spec_info
-                    else CaptureHiddenMode.NULL
-                )
-            ),
+            capture_hidden_mode=capture_hidden_mode,
             extend_input_logprob_token_ids=self.extend_input_logprob_token_ids,
         )
 

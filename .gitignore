@@ -1,5 +1,8 @@
 meta-llama/
 
+toploc-scripts/test_fingerprint.py
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -238,7 +238,8 @@ class CudaGraphRunner:
                     dtype=self.model_runner.dtype,
                 )
 
-            if self.model_runner.verification_algorithm.is_toploc():
+            # Check if toploc verification is enabled via server args directly
+            if self.model_runner.server_args.toploc_fingerprint:
                 self.verification_hidden_states = torch.zeros(
                     (1, self.model_runner.model_config.hidden_size),
                     dtype=self.model_runner.dtype,
