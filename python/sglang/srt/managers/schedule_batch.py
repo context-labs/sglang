@@ -312,7 +312,14 @@ class Req:
         self.to_abort_message: str = "Unknown error"
         self.stream = stream
         self.eos_token_ids = eos_token_ids
+
+        # Proof generation (input)
+        self.verification_hidden_states = []
+        self.verification_proofs = []
+
+        # Proof verification (output)
         self.verification_proof_to_validate = verification_proof_to_validate
+        self.verification_proof_validation_result = None
 
         # For incremental decoding
         # ----- | --------- read_ids -------|
@@ -400,9 +407,6 @@ class Req:
         # This is used to compute the average acceptance length per request.
         self.spec_verify_ct = 0
         self.lora_path = lora_path
-
-        # For storing verification proofs
-        self.verification_proofs = []
 
     @property
     def seqlen(self):

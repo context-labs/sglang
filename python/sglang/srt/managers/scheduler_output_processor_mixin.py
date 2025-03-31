@@ -6,7 +6,10 @@ from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 from sglang.srt.layers.logits_processor import LogitsProcessorOutput
 from sglang.srt.managers.io_struct import BatchEmbeddingOut, BatchTokenIDOut
 from sglang.srt.managers.schedule_batch import BaseFinishReason, Req, ScheduleBatch
-from sglang.srt.verification.verification_utils import create_toploc_proofs
+from sglang.srt.verification.verification_utils import (
+    create_toploc_proof,
+    verify_toploc_proof,
+)
 
 if TYPE_CHECKING:
     from sglang.srt.managers.scheduler import (
@@ -119,33 +122,36 @@ class SchedulerOutputProcessorMixin:
                         )
 
                     if logits_output.verification_hidden_states is not None:
-                        # Process verification hidden states for the current request
-                        logger.debug(
-                            f"Processing verification hidden states for prefill in req {req}"
+                        # each item in verification_hidden_states is [N,D] when N is number of tokens
+                        verification_hidden_state = (
+                            logits_output.verification_hidden_states[i].cpu().clone()
                         )
+                        logger.debug(
+                            f"Verification hidden state in decode step: {verification_hidden_state.shape}"
+                        )
+                        req.verification_hidden_states.append(verification_hidden_state)
                         req.verification_proofs.append(
-                            create_toploc_proofs(
-                                logits_output.verification_hidden_states[
-                                    hidden_state_offset : (
-                                        hidden_state_offset := hidden_state_offset
-                                        + len(req.origin_input_ids)
-                                    )
-                                ]
-                                .cpu()
-                                .clone()
+                            create_toploc_proof(verification_hidden_state)
+                        )
+                        logger.debug(
+                            f"Added verification proof #{len(req.verification_proofs)} to req (decode)"
+                        )
+                        if req.verification_proof_to_validate is not None:
+                            req.verification_proof_validation_result = (
+                                verify_toploc_proof(
+                                    verification_hidden_state,
+                                    req.verification_proof_to_validate,
+                                )
                             )
-                        )
-                        logger.debug(
-                            f"Added verification proof #{len(req.verification_proofs)} to req (prefill)"
-                        )
+                            logger.debug(
+                                f"Verified proof #{len(req.verification_proofs)} in req (decode)"
+                            )
                     else:
-                        logger.debug(
-                            "No verification hidden states to process into proofs when prefilling"
-                        )
+                        logger.debug("No verification hidden states to process")
 
-                    if req.grammar is not None:
-                        req.grammar.accept_token(next_token_id)
-                        req.grammar.finished = req.finished()
+                        if req.grammar is not None:
+                            req.grammar.accept_token(next_token_id)
+                            req.grammar.finished = req.finished()
                 else:
                     # being chunked reqs' prefill is not finished
                     req.is_chunked -= 1
@@ -280,19 +286,30 @@ class SchedulerOutputProcessorMixin:
                 )
 
             if logits_output.verification_hidden_states is not None:
-                logger.debug(f"Processing verification hidden states for decode in req")
+                # each item in verification_hidden_states is [N,D] when N is number of tokens
+                verification_hidden_state = (
+                    logits_output.verification_hidden_states[i].cpu().clone()
+                )
+                logger.debug(
+                    f"Verification hidden state in prefill step: {verification_hidden_state.shape}"
+                )
+                req.verification_hidden_states.append(verification_hidden_state)
                 req.verification_proofs.append(
-                    create_toploc_proofs(
-                        logits_output.verification_hidden_states[i].cpu().clone()
+                    create_toploc_proof(verification_hidden_state)
+                )
+                logger.debug(
+                    f"Added verification proof #{len(req.verification_proofs)} to req (prefill)"
+                )
+                if req.verification_proof_to_validate is not None:
+                    req.verification_proof_validation_result = verify_toploc_proof(
+                        verification_hidden_state[-1, ...],  # last token
+                        req.verification_proof_to_validate,
                     )
-                )
-                logger.debug(
-                    f"Added verification proof #{len(req.verification_proofs)} to req (decode)"
-                )
+                    logger.debug(
+                        f"Verified proof #{len(req.verification_proofs)} in req (prefill)"
+                    )
             else:
-                logger.debug(
-                    "No verification hidden states to process into proofs when decoding"
-                )
+                logger.debug("No verification hidden states to process")
 
             if req.grammar is not None and batch.spec_algorithm.is_none():
                 req.grammar.accept_token(next_token_id)
