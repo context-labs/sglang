@@ -877,6 +877,14 @@ class TokenizerManager:
 
         while True:
             recv_obj = await self.recv_from_detokenizer.recv_pyobj()
+            # Log whether verification_proofs is in the received object
+            if isinstance(recv_obj, BatchTokenIDOut):
+                logger.debug(
+                    f"BatchTokenIDOut received, has verification_proofs: {hasattr(recv_obj, 'verification_proofs')}"
+                )
+                logger.debug(
+                    f"BatchTokenIDOut verification_proofs content: {getattr(recv_obj, 'verification_proofs', None)}"
+                )
             self._result_dispatcher(recv_obj)
             self.last_receive_tstamp = time.time()
 
@@ -919,6 +927,26 @@ class TokenizerManager:
             if getattr(recv_obj, "output_hidden_states", None):
                 meta_info["hidden_states"] = recv_obj.output_hidden_states[i]
 
+            # Add verification proofs to meta_info if they exist
+            if getattr(recv_obj, "verification_proofs", None) is not None:
+                try:
+                    # Make sure verification_proofs is properly extracted and formatted
+                    if i < len(recv_obj.verification_proofs):
+                        proofs = recv_obj.verification_proofs[i]
+                        logger.debug(
+                            f"Adding verification proofs to meta_info for rid {rid}: {len(proofs)} proofs"
+                        )
+                        meta_info["verification_proofs"] = proofs
+                    else:
+                        logger.warning(
+                            f"verification_proofs index {i} out of range (len={len(recv_obj.verification_proofs)})"
+                        )
+                except Exception as e:
+                    logger.error(f"Error processing verification proofs: {e}")
+            else:
+                logger.debug(
+                    f"No verification_proofs attribute on recv_obj for rid {rid}"
+                )
             if isinstance(recv_obj, BatchStrOut):
                 out_dict = {
                     "text": recv_obj.output_strs[i],

@@ -616,37 +616,44 @@ class SchedulerOutputProcessorMixin:
         if rids:
             if self.model_config.is_multimodal_gen:
                 return
-            self.send_to_detokenizer.send_pyobj(
-                BatchTokenIDOut(
-                    rids,
-                    finished_reasons,
-                    decoded_texts,
-                    decode_ids_list,
-                    read_offsets,
-                    output_ids,
-                    skip_special_tokens,
-                    spaces_between_special_tokens,
-                    no_stop_trim,
-                    prompt_tokens,
-                    completion_tokens,
-                    cached_tokens,
-                    spec_verify_ct,
-                    input_token_logprobs_val,
-                    input_token_logprobs_idx,
-                    output_token_logprobs_val,
-                    output_token_logprobs_idx,
-                    input_top_logprobs_val,
-                    input_top_logprobs_idx,
-                    output_top_logprobs_val,
-                    output_top_logprobs_idx,
-                    input_token_ids_logprobs_val,
-                    input_token_ids_logprobs_idx,
-                    output_token_ids_logprobs_val,
-                    output_token_ids_logprobs_idx,
-                    output_hidden_states,
-                    verification_proofs,
-                )
+            # Create the BatchTokenIDOut object and log its contents
+            batch_out = BatchTokenIDOut(
+                rids,
+                finished_reasons,
+                decoded_texts,
+                decode_ids_list,
+                read_offsets,
+                output_ids,
+                skip_special_tokens,
+                spaces_between_special_tokens,
+                no_stop_trim,
+                prompt_tokens,
+                completion_tokens,
+                cached_tokens,
+                spec_verify_ct,
+                input_token_logprobs_val,
+                input_token_logprobs_idx,
+                output_token_logprobs_val,
+                output_token_logprobs_idx,
+                input_top_logprobs_val,
+                input_top_logprobs_idx,
+                output_top_logprobs_val,
+                output_top_logprobs_idx,
+                input_token_ids_logprobs_val,
+                input_token_ids_logprobs_idx,
+                output_token_ids_logprobs_val,
+                output_token_ids_logprobs_idx,
+                output_hidden_states,
+                verification_proofs,
             )
+
+            # Log what verification_proofs looks like in the batch object
+            logger.debug(
+                f"BatchTokenIDOut verification_proofs before send: {getattr(batch_out, 'verification_proofs', None)}"
+            )
+
+            # Send to detokenizer
+            self.send_to_detokenizer.send_pyobj(batch_out)
 
     def stream_output_embedding(self, reqs: List[Req]):
         rids = []

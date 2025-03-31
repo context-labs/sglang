@@ -1147,14 +1147,25 @@ def v1_chat_generate_response(
                         "Failed to parse fc related info to json format!",
                     )
 
-        # Extract verification proofs if available
         verification_proofs = ret_item["meta_info"].get("verification_proofs", None)
         if verification_proofs:
             logger.debug(
                 f"Retrieved verification proofs from response: {len(verification_proofs)} proof sets"
             )
+            verification_proofs = (
+                [verification_proofs]
+                if not isinstance(verification_proofs, list)
+                else verification_proofs
+            )
         else:
             logger.debug("No verification proofs found in response")
+
+        # Extract verification proofs if available
+        if verification_proofs:
+            logger.debug(f"Verification proofs type: {type(verification_proofs)}")
+            logger.debug(f"Verification proofs content: {verification_proofs}")
+        else:
+            verification_proofs = None
 
         if to_file:
             # to make the choice data json serializable
@@ -1165,9 +1176,7 @@ def v1_chat_generate_response(
                     "content": text if text else None,
                     "tool_calls": tool_calls,
                     "reasoning_content": reasoning_text if reasoning_text else None,
-                    "verification_proofs": (
-                        verification_proofs if verification_proofs else None
-                    ),
+                    "verification_proofs": verification_proofs,
                 },
                 "logprobs": choice_logprobs.model_dump() if choice_logprobs else None,
                 "finish_reason": (finish_reason["type"] if finish_reason else ""),
@@ -1185,9 +1194,7 @@ def v1_chat_generate_response(
                     content=text if text else None,
                     tool_calls=tool_calls,
                     reasoning_content=reasoning_text if reasoning_text else None,
-                    verification_proofs=(
-                        verification_proofs if verification_proofs else None
-                    ),
+                    verification_proofs=verification_proofs,
                 ),
                 logprobs=choice_logprobs,
                 finish_reason=(finish_reason["type"] if finish_reason else ""),
