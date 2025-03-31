@@ -1344,6 +1344,14 @@ class ScheduleBatch:
         ):
             capture_hidden_mode = CaptureHiddenMode.LAST
 
+        verification_proofs_to_validate = [
+            r.verification_proof_to_validate for r in self.reqs
+        ]
+
+        logger.debug(
+            f"vptv when constructing ModelWorkerBatch: {verification_proofs_to_validate}"
+        )
+
         return ModelWorkerBatch(
             bid=bid,
             forward_mode=self.forward_mode,
@@ -1376,6 +1384,7 @@ class ScheduleBatch:
             verification_algorithm=self.verification_algorithm,
             capture_hidden_mode=capture_hidden_mode,
             extend_input_logprob_token_ids=self.extend_input_logprob_token_ids,
+            verification_proofs_to_validate=verification_proofs_to_validate,
         )
 
     def copy(self):
@@ -1461,6 +1470,8 @@ class ModelWorkerBatch:
     verification_algorithm: VerificationAlgorithm = None
     # If set, the output of the batch contains the hidden states of the run.
     capture_hidden_mode: CaptureHiddenMode = None
+    # Verification proofs to validate
+    verification_proofs_to_validate: Optional[List[VerificationProof]] = None
 
 
 @triton.jit
