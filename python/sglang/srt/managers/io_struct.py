@@ -230,6 +230,7 @@ class GenerateReqInput:
         return self.rid
 
     def __getitem__(self, i):
+        logger.debug("In __getitem__ of GenerateReqInput")
         return GenerateReqInput(
             text=self.text[i] if self.text is not None else None,
             input_ids=self.input_ids[i] if self.input_ids is not None else None,
