@@ -1,6 +1,7 @@
 import json
 import os
 import signal
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -65,20 +66,27 @@ import openai
 
 client = openai.Client(base_url=f"http://127.0.0.1:{port}/v1", api_key="None")
 
+params = {
+    "temperature": 0,
+    "seed": FIXED_SEED,
+}
+
 print("Sending request with toploc-fingerprint enabled on server...")
 response = client.chat.completions.create(
     model="meta-llama/Llama-3.1-8B-Instruct",
     messages=[
         {"role": "user", "content": "What is the capital of France?"},
     ],
-    temperature=0,
-    seed=FIXED_SEED,
+    **params,
+    extra_body={"return_input_ids": True},
 )
 
 # Print the response
 print("Response received:")
 response_dump = response.model_dump()
 print(json.dumps(response_dump, indent=4))
+
+sys.exit(1)
 
 original_content = response_dump["choices"][0]["message"]["content"]
 last_token_proof = response_dump["choices"][0]["message"]["verification_proofs"][-1]
@@ -91,18 +99,17 @@ prefill_response = client.chat.completions.create(
         {"role": "assistant", "content": original_content},
     ],
     max_tokens=0,
-    temperature=0,
-    seed=FIXED_SEED,
-    extra_body={"verification_proof_to_validate": last_token_proof},
+    **params,
+    extra_body={
+        "verification_proof_to_validate": last_token_proof,
+        "return_input_ids": True,
+    },
 )
 
 prefill_dump = prefill_response.model_dump()
 print("Prefill response received:")
 print(json.dumps(prefill_dump, indent=4))
 
-prefill_last_token_proof = prefill_dump["choices"][0]["message"]["verification_proofs"][
-    -1
-][0]
 
 # Terminate the server
 print("Terminating server...")

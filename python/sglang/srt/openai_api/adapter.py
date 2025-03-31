@@ -1263,6 +1263,26 @@ def v1_chat_generate_response(
         )
         completion_tokens = sum(item["meta_info"]["completion_tokens"] for item in ret)
         cached_tokens = sum(item["meta_info"].get("cached_tokens", 0) for item in ret)
+        input_ids = None
+
+        logger.debug(f"Creating ChatCompletionResponse with:")
+        if hasattr(request, "return_input_ids"):
+            logger.debug(f"  return_input_ids flag: {request.return_input_ids}")
+        else:
+            logger.debug(f"  No return_input_ids attribute on request")
+
+        if ret and "origin_input_ids" in ret[0]["meta_info"]:
+            logger.debug(f"  Found origin_input_ids in meta_info")
+            logger.debug(f"  meta_info keys: {list(ret[0]['meta_info'].keys())}")
+            # Set input_ids from the origin_input_ids in meta_info
+            if hasattr(request, "return_input_ids") and request.return_input_ids:
+                input_ids = ret[0]["meta_info"]["origin_input_ids"]
+                logger.debug(f"  Setting input_ids to: {input_ids[:10]}... (truncated)")
+        else:
+            logger.debug(f"  No origin_input_ids in meta_info")
+            if ret:
+                logger.debug(f"  meta_info keys: {list(ret[0]['meta_info'].keys())}")
+
         response = ChatCompletionResponse(
             id=ret[0]["meta_info"]["id"],
             model=request.model,
@@ -1275,6 +1295,7 @@ def v1_chat_generate_response(
                     {"cached_tokens": cached_tokens} if cache_report else None
                 ),
             ),
+            input_ids=input_ids,
         )
         return response
 

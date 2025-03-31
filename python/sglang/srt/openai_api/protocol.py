@@ -347,7 +347,11 @@ class ChatCompletionRequest(BaseModel):
     session_params: Optional[Dict] = None
     separate_reasoning: bool = True
     stream_reasoning: bool = True
+
+    # Extra parameters for SRT backend only and will be ignored by OpenAI models.
     verification_proof_to_validate: Optional[str] = None
+    return_input_ids: bool = False
+    return_output_ids: bool = False
 
 
 class FunctionResponse(BaseModel):
@@ -389,6 +393,7 @@ class ChatCompletionResponse(BaseModel):
     model: str
     choices: List[ChatCompletionResponseChoice]
     usage: UsageInfo
+    input_ids: Optional[List[int]] = None
 
 
 class DeltaMessage(BaseModel):

@@ -437,6 +437,9 @@ class BatchTokenIDOut:
     output_token_ids_logprobs_val: List[List]
     output_token_ids_logprobs_idx: List[List]
 
+    # Input IDs / Output IDs
+    origin_input_ids: List[List[int]]
+
     # Hidden states
     output_hidden_states: List[List[float]]
 
@@ -494,6 +497,9 @@ class BatchStrOut:
     # Verification proofs
     verification_proofs: List[List]
     verification_proof_validation_results: List[Optional[str]] = None
+
+    # Origin input ids (for return_input_ids=True)
+    origin_input_ids: Optional[List[List[int]]] = None
 
 
 @dataclass

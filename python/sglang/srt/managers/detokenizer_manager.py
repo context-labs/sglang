@@ -232,6 +232,7 @@ class DetokenizerManager:
             output_hidden_states=recv_obj.output_hidden_states,
             verification_proofs=recv_obj.verification_proofs,
             verification_proof_validation_results=recv_obj.verification_proof_validation_results,
+            origin_input_ids=recv_obj.origin_input_ids,
         )
 
     def handle_multimodal_decode_req(self, recv_obj: BatchMultimodalDecodeReq):

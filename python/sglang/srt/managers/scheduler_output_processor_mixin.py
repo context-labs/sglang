@@ -526,6 +526,7 @@ class SchedulerOutputProcessorMixin:
         output_hidden_states = None
         verification_proofs = None
         verification_proof_validation_results = None
+        origin_input_ids = []
 
         if return_logprob:
             input_token_logprobs_val = []
@@ -636,6 +637,18 @@ class SchedulerOutputProcessorMixin:
                     req.verification_proof_validation_result
                 )
 
+                if (
+                    hasattr(req, "origin_input_ids")
+                    and req.origin_input_ids is not None
+                ):
+                    origin_input_ids.append(list(req.origin_input_ids))
+                else:
+                    origin_input_ids.append([])
+
+        logger.debug(
+            f" just prior to batch_out creation origin_input_ids: {origin_input_ids}"
+        )
+
         # Send to detokenizer
         if rids:
             if self.model_config.is_multimodal_gen:
@@ -667,6 +680,7 @@ class SchedulerOutputProcessorMixin:
                 input_token_ids_logprobs_idx,
                 output_token_ids_logprobs_val,
                 output_token_ids_logprobs_idx,
+                origin_input_ids,
                 output_hidden_states,
                 verification_proofs,
                 verification_proof_validation_results,
