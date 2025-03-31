@@ -603,13 +603,12 @@ class SchedulerOutputProcessorMixin:
                         output_hidden_states = []
                     output_hidden_states.append(req.hidden_states)
 
-                # Collect verification proofs if requested
-                if hasattr(req, "verification_proofs"):
-                    logger.debug(
-                        f"Collecting verification proofs for req {req}: {len(req.verification_proofs) if req.verification_proofs else 0} proofs"
-                    )
-                    if verification_proofs is None:
-                        verification_proofs = []
+                if verification_proofs is None:
+                    verification_proofs = []
+                if (
+                    hasattr(req, "verification_proofs")
+                    and req.verification_proofs is not None
+                ):
                     verification_proofs.append(req.verification_proofs)
 
         # Send to detokenizer
@@ -649,7 +648,7 @@ class SchedulerOutputProcessorMixin:
 
             # Log what verification_proofs looks like in the batch object
             logger.debug(
-                f"BatchTokenIDOut verification_proofs before send: {getattr(batch_out, 'verification_proofs', None)}"
+                f"BatchTokenIDOut verification_proofs before send ({rids}): {getattr(batch_out, 'verification_proofs', None)}"
             )
 
             # Send to detokenizer

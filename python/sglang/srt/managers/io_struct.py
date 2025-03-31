@@ -429,7 +429,7 @@ class BatchTokenIDOut:
     output_hidden_states: List[List[float]]
 
     # Verification proofs
-    verification_proofs: List[List] = field(default_factory=list)
+    verification_proofs: List[List]
 
 
 @dataclass
@@ -477,7 +477,9 @@ class BatchStrOut:
 
     # Hidden states
     output_hidden_states: List[List[float]]
-    verification_proofs: List[List] = None
+
+    # Verification proofs
+    verification_proofs: List[List]
 
 
 @dataclass
