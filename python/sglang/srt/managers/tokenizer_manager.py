@@ -968,6 +968,37 @@ class TokenizerManager:
                 logger.debug(
                     f"No verification_proofs attribute on recv_obj for rid {rid}"
                 )
+
+            # Add verification proof validation results to meta_info if they exist
+            if (
+                getattr(recv_obj, "verification_proof_validation_results", None)
+                is not None
+            ):
+                try:
+                    # Make sure verification_proof_validation_results is properly extracted and formatted
+                    if i < len(recv_obj.verification_proof_validation_results):
+                        validation_result = (
+                            recv_obj.verification_proof_validation_results[i]
+                        )
+                        logger.debug(
+                            f"Adding verification proof validation result to meta_info for rid {rid}: {validation_result}"
+                        )
+                        meta_info["verification_proof_validation_result"] = (
+                            validation_result
+                        )
+                    else:
+                        logger.warning(
+                            f"verification_proof_validation_results index {i} out of range (len={len(recv_obj.verification_proof_validation_results)})"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Error processing verification proof validation results: {e}"
+                    )
+            else:
+                logger.debug(
+                    f"No verification_proof_validation_results attribute on recv_obj for rid {rid}"
+                )
+
             if isinstance(recv_obj, BatchStrOut):
                 out_dict = {
                     "text": recv_obj.output_strs[i],

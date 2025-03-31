@@ -371,7 +371,7 @@ class ChatMessage(BaseModel):
     reasoning_content: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = Field(default=None, examples=[None])
     verification_proofs: Optional[List] = None
-    verification_results: Optional[str] = None
+    verification_proof_validation_result: Optional[str] = None
 
 
 class ChatCompletionResponseChoice(BaseModel):
@@ -397,7 +397,7 @@ class DeltaMessage(BaseModel):
     reasoning_content: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = Field(default=None, examples=[None])
     verification_proofs: Optional[List] = None
-    verification_results: Optional[str] = None
+    verification_proof_validation_result: Optional[str] = None
 
 
 class ChatCompletionResponseStreamChoice(BaseModel):

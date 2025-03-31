@@ -704,7 +704,7 @@ def v1_generate_response(request, ret, tokenizer_manager, to_file=False):
                 total_tokens=prompt_tokens + completion_tokens,
             ),
         )
-    return response
+        return response
 
 
 async def v1_completions(tokenizer_manager, raw_request: Request):
@@ -1177,12 +1177,18 @@ def v1_chat_generate_response(
         else:
             verification_proofs = None
 
-        verification_results = ret_item["meta_info"].get("verification_results", None)
-        if verification_results:
-            logger.debug(f"Verification results type: {type(verification_results)}")
-            logger.debug(f"Verification results content: {verification_results}")
+        verification_proof_validation_result = ret_item["meta_info"].get(
+            "verification_proof_validation_result", None
+        )
+        if verification_proof_validation_result:
+            logger.debug(
+                f"Verification proof validation result type: {type(verification_proof_validation_result)}"
+            )
+            logger.debug(
+                f"Verification proof validation result content: {verification_proof_validation_result}"
+            )
         else:
-            verification_results = None
+            verification_proof_validation_result = None
 
         if to_file:
             # to make the choice data json serializable
@@ -1194,6 +1200,7 @@ def v1_chat_generate_response(
                     "tool_calls": tool_calls,
                     "reasoning_content": reasoning_text if reasoning_text else None,
                     "verification_proofs": verification_proofs,
+                    "verification_proof_validation_result": verification_proof_validation_result,
                 },
                 "logprobs": choice_logprobs.model_dump() if choice_logprobs else None,
                 "finish_reason": (finish_reason["type"] if finish_reason else ""),
@@ -1212,7 +1219,7 @@ def v1_chat_generate_response(
                     tool_calls=tool_calls,
                     reasoning_content=reasoning_text if reasoning_text else None,
                     verification_proofs=verification_proofs,
-                    verification_results=verification_results,
+                    verification_proof_validation_result=verification_proof_validation_result,
                 ),
                 logprobs=choice_logprobs,
                 finish_reason=(finish_reason["type"] if finish_reason else ""),

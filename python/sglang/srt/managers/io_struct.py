@@ -442,6 +442,7 @@ class BatchTokenIDOut:
 
     # Verification proofs
     verification_proofs: List[List]
+    verification_proof_validation_results: List[Optional[str]] = None
 
 
 @dataclass
@@ -492,6 +493,7 @@ class BatchStrOut:
 
     # Verification proofs
     verification_proofs: List[List]
+    verification_proof_validation_results: List[Optional[str]] = None
 
 
 @dataclass

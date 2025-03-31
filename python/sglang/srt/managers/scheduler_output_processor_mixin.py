@@ -525,6 +525,7 @@ class SchedulerOutputProcessorMixin:
         spec_verify_ct = []
         output_hidden_states = None
         verification_proofs = None
+        verification_proof_validation_results = None
 
         if return_logprob:
             input_token_logprobs_val = []
@@ -628,6 +629,13 @@ class SchedulerOutputProcessorMixin:
                 ):
                     verification_proofs.append(req.verification_proofs)
 
+                # Collect verification proof validation results
+                if verification_proof_validation_results is None:
+                    verification_proof_validation_results = []
+                verification_proof_validation_results.append(
+                    req.verification_proof_validation_result
+                )
+
         # Send to detokenizer
         if rids:
             if self.model_config.is_multimodal_gen:
@@ -661,11 +669,15 @@ class SchedulerOutputProcessorMixin:
                 output_token_ids_logprobs_idx,
                 output_hidden_states,
                 verification_proofs,
+                verification_proof_validation_results,
             )
 
             # Log what verification_proofs looks like in the batch object
             logger.debug(
                 f"BatchTokenIDOut verification_proofs before send ({rids}): {getattr(batch_out, 'verification_proofs', None)}"
+            )
+            logger.debug(
+                f"BatchTokenIDOut verification_proof_validation_results before send ({rids}): {getattr(batch_out, 'verification_proof_validation_results', None)}"
             )
 
             # Send to detokenizer
