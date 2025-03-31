@@ -227,6 +227,9 @@ class ForwardBatch:
     # For Qwen2-VL
     mrope_positions: torch.Tensor = None
 
+    # Verification proof to validate
+    verification_proofs_to_validate: Optional[List[str]] = None
+
     @classmethod
     def init_new(
         cls,
@@ -267,6 +270,7 @@ class ForwardBatch:
             input_embeds=batch.input_embeds,
             extend_input_logprob_token_ids_gpu=extend_input_logprob_token_ids_gpu,
             verification_algorithm=batch.verification_algorithm,
+            verification_proofs_to_validate=batch.verification_proofs_to_validate,
         )
 
         # For DP attention
