@@ -73,6 +73,9 @@ class GenerateReqInput:
     # Session info for continual prompting
     session_params: Optional[Union[List[Dict], Dict]] = None
 
+    # Verification proofs to validate against activations
+    verification_proof_to_validate: Optional[Union[List[str], str]] = None
+
     # Custom logit processor for advanced sampling control. Must be a serialized instance
     # of `CustomLogitProcessor` in python/sglang/srt/sampling/custom_logit_processor.py
     # Use the processor's `to_str()` method to generate the serialized string.
@@ -248,6 +251,11 @@ class GenerateReqInput:
                 else None
             ),
             return_hidden_states=self.return_hidden_states,
+            verification_proof_to_validate=(
+                self.verification_proof_to_validate[i]
+                if self.verification_proof_to_validate is not None
+                else None
+            ),
         )
 
 
@@ -289,6 +297,9 @@ class TokenizedGenerateReqInput:
 
     # Whether to return hidden states
     return_hidden_states: bool = False
+
+    # Verification proofs to validate
+    verification_proof_to_validate: Optional[str] = None
 
 
 @dataclass

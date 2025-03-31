@@ -328,6 +328,10 @@ class TokenizerManager:
                 "Please add `--is-embedding` when launching the server or try another model."
             )
 
+        logger.debug(
+            f"In generate_request (pre normalization), vptv: {obj.verification_proof_to_validate if hasattr(obj, 'verification_proof_to_validate') else None}"
+        )
+
         obj.normalize_batch_and_arguments()
 
         if self.log_requests:
@@ -335,6 +339,10 @@ class TokenizerManager:
             logger.info(
                 f"Receive: obj={dataclass_to_string_truncated(obj, max_length, skip_names=skip_names)}"
             )
+
+        logger.debug(
+            f"In generate_request (post normalization), vptv: {obj.verification_proof_to_validate if hasattr(obj, 'verification_proof_to_validate') else None}"
+        )
 
         async with self.model_update_lock.reader_lock:
             is_single = obj.is_single
@@ -357,6 +365,11 @@ class TokenizerManager:
         # Tokenize
         input_embeds = None
         input_text = obj.text
+
+        logger.debug(
+            f"In _tokenize_one_request, vptv: {obj.verification_proof_to_validate if hasattr(obj, 'verification_proof_to_validate') else None}"
+        )
+
         if obj.input_embeds is not None:
             if not self.server_args.disable_radix_cache:
                 raise ValueError(
@@ -436,6 +449,7 @@ class TokenizerManager:
                 session_params=session_params,
                 custom_logit_processor=obj.custom_logit_processor,
                 return_hidden_states=obj.return_hidden_states,
+                verification_proof_to_validate=obj.verification_proof_to_validate,
             )
         elif isinstance(obj, EmbeddingReqInput):
             tokenized_obj = TokenizedEmbeddingReqInput(
@@ -522,6 +536,13 @@ class TokenizerManager:
         created_time: Optional[float] = None,
     ):
         batch_size = obj.batch_size
+
+        logger.debug(
+            f"In _handle_batch_request, vptv: {obj.verification_proof_to_validate if hasattr(obj, 'verification_proof_to_validate') else None}"
+        )
+        logger.debug(
+            f"... at index 0: {obj[0].verification_proof_to_validate if hasattr(obj[0], 'verification_proof_to_validate') else None}"
+        )
 
         generators = []
         rids = []

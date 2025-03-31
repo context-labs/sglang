@@ -5,6 +5,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+DISABLE_CUDA_GRAPH = True
+
+FIXED_SEED = 42
+MAYBE_DISABLE_CUDA_GRAPH = "--disable-cuda-graph" if DISABLE_CUDA_GRAPH else ""
+
 # load from .env in the same directory as this script
 
 script_dir = Path(__file__).parent.absolute()
@@ -41,8 +46,8 @@ else:
 
 print("Starting server with TopLoc fingerprint verification enabled...")
 server_process, port = launch_server_cmd(
-    """
-python -m sglang.launch_server --model-path meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --toploc-fingerprint --log-level debug
+    f"""
+python -m sglang.launch_server --model-path meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --toploc-fingerprint --log-level debug {MAYBE_DISABLE_CUDA_GRAPH}
 """
 )
 
@@ -52,8 +57,8 @@ wait_for_server(f"http://localhost:{port}")
 # Add an additional delay to ensure server is fully initialized
 import time
 
-print("Waiting 5 more seconds for server to be fully initialized...")
-time.sleep(5)
+print("Waiting 3 more seconds for server to be fully initialized...")
+time.sleep(3)
 
 # Send an inference request using the OpenAI client
 import openai
@@ -67,6 +72,7 @@ response = client.chat.completions.create(
         {"role": "user", "content": "What is the capital of France?"},
     ],
     temperature=0,
+    seed=FIXED_SEED,
 )
 
 # Print the response
@@ -74,19 +80,29 @@ print("Response received:")
 response_dump = response.model_dump()
 print(json.dumps(response_dump, indent=4))
 
-# Check if verification proofs are in the response
-if "choices" in response_dump and len(response_dump["choices"]) > 0:
-    message = response_dump["choices"][0].get("message", {})
-    if "verification_proofs" in message:
-        if message["verification_proofs"] is not None:
-            print("SUCCESS: Verification proofs are included in the response!")
-            print(f"Number of proof sets: {len(message['verification_proofs'])}")
-        else:
-            print("PARTIAL SUCCESS: verification_proofs field exists but is null")
-            print("We need to debug why proofs aren't being generated")
-    else:
-        print("ERROR: No verification_proofs field in the response")
-        print("Available message fields:", list(message.keys()))
+original_content = response_dump["choices"][0]["message"]["content"]
+last_token_proof = response_dump["choices"][0]["message"]["verification_proofs"][-1][0]
+
+# Do a prefill
+prefill_response = client.chat.completions.create(
+    model="meta-llama/Llama-3.1-8B-Instruct",
+    messages=[
+        {"role": "user", "content": "What is the capital of France?"},
+        {"role": "assistant", "content": original_content},
+    ],
+    max_tokens=0,
+    temperature=0,
+    seed=FIXED_SEED,
+    extra_body={"verification_proof_to_validate": last_token_proof},
+)
+
+prefill_dump = prefill_response.model_dump()
+print("Prefill response received:")
+print(json.dumps(prefill_dump, indent=4))
+
+prefill_last_token_proof = prefill_dump["choices"][0]["message"]["verification_proofs"][
+    -1
+][0]
 
 # Terminate the server
 print("Terminating server...")

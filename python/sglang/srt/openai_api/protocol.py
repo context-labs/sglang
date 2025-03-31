@@ -347,6 +347,7 @@ class ChatCompletionRequest(BaseModel):
     session_params: Optional[Dict] = None
     separate_reasoning: bool = True
     stream_reasoning: bool = True
+    verification_proof_to_validate: Optional[str] = None
 
 
 class FunctionResponse(BaseModel):
@@ -370,6 +371,7 @@ class ChatMessage(BaseModel):
     reasoning_content: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = Field(default=None, examples=[None])
     verification_proofs: Optional[List] = None
+    verification_results: Optional[str] = None
 
 
 class ChatCompletionResponseChoice(BaseModel):
@@ -395,6 +397,7 @@ class DeltaMessage(BaseModel):
     reasoning_content: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = Field(default=None, examples=[None])
     verification_proofs: Optional[List] = None
+    verification_results: Optional[str] = None
 
 
 class ChatCompletionResponseStreamChoice(BaseModel):

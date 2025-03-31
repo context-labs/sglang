@@ -876,6 +876,7 @@ def v1_chat_generate_request(
     top_logprobs_nums = []
     modalities_list = []
     lora_paths = []
+    verification_proofs_to_validate = []
 
     # NOTE: with openai API, the prompt's logprobs are always not computed
 
@@ -972,6 +973,10 @@ def v1_chat_generate_request(
         logprob_start_lens.append(-1)
         top_logprobs_nums.append(request.top_logprobs or 0)
         lora_paths.append(request.lora_path)
+        logger.debug(
+            f"Adding verification proof to validate: {request.verification_proof_to_validate} to proofs list {verification_proofs_to_validate}"
+        )
+        verification_proofs_to_validate.append(request.verification_proof_to_validate)
 
         sampling_params = {
             "temperature": request.temperature,
@@ -1025,6 +1030,9 @@ def v1_chat_generate_request(
         else:
             prompt_kwargs = {"input_ids": input_ids}
 
+    logger.debug(
+        f"Adapting request verification proof to validate: {verification_proofs_to_validate}"
+    )
     adapted_request = GenerateReqInput(
         **prompt_kwargs,
         image_data=image_data_list,
@@ -1037,6 +1045,7 @@ def v1_chat_generate_request(
         rid=request_ids,
         modalities=modalities_list,
         lora_path=lora_paths,
+        verification_proof_to_validate=verification_proofs_to_validate,
     )
 
     return adapted_request, all_requests if len(all_requests) > 1 else all_requests[0]
@@ -1167,6 +1176,13 @@ def v1_chat_generate_response(
         else:
             verification_proofs = None
 
+        verification_results = ret_item["meta_info"].get("verification_results", None)
+        if verification_results:
+            logger.debug(f"Verification results type: {type(verification_results)}")
+            logger.debug(f"Verification results content: {verification_results}")
+        else:
+            verification_results = None
+
         if to_file:
             # to make the choice data json serializable
             choice_data = {
@@ -1195,6 +1211,7 @@ def v1_chat_generate_response(
                     tool_calls=tool_calls,
                     reasoning_content=reasoning_text if reasoning_text else None,
                     verification_proofs=verification_proofs,
+                    verification_results=verification_results,
                 ),
                 logprobs=choice_logprobs,
                 finish_reason=(finish_reason["type"] if finish_reason else ""),
@@ -1258,6 +1275,10 @@ async def v1_chat_completions(tokenizer_manager, raw_request: Request):
     request_json = await raw_request.json()
     all_requests = [ChatCompletionRequest(**request_json)]
     adapted_request, request = v1_chat_generate_request(all_requests, tokenizer_manager)
+
+    logger.debug(
+        f"in v1_chat_completions, adapted_request, vptv: {adapted_request.verification_proof_to_validate}"
+    )
 
     if adapted_request.stream:
         parser_dict = {}
@@ -1554,6 +1575,10 @@ async def v1_chat_completions(tokenizer_manager, raw_request: Request):
             media_type="text/event-stream",
             background=tokenizer_manager.create_abort_task(adapted_request),
         )
+
+    logger.debug(
+        f"In v1_chat_completions (pre generate_request), vptv: {adapted_request.verification_proof_to_validate if hasattr(adapted_request, 'verification_proof_to_validate') else None}"
+    )
 
     # Non-streaming response.
     try:

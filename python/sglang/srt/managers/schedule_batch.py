@@ -271,6 +271,7 @@ class Req:
         custom_logit_processor: Optional[str] = None,
         return_hidden_states: bool = False,
         eos_token_ids: Optional[Set[int]] = None,
+        verification_proof_to_validate: Optional[str] = None,
     ):
         # Input and output info
         self.rid = rid
@@ -311,6 +312,7 @@ class Req:
         self.to_abort_message: str = "Unknown error"
         self.stream = stream
         self.eos_token_ids = eos_token_ids
+        self.verification_proof_to_validate = verification_proof_to_validate
 
         # For incremental decoding
         # ----- | --------- read_ids -------|

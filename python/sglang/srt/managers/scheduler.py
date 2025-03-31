@@ -659,6 +659,10 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 )
                 custom_logit_processor = None
 
+            logger.debug(
+                f"Adding req with verification_proof_to_validate vptv: {recv_req.verification_proof_to_validate}"
+            )
+
             req = Req(
                 recv_req.rid,
                 recv_req.input_text,
@@ -673,6 +677,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 custom_logit_processor=custom_logit_processor,
                 return_hidden_states=recv_req.return_hidden_states,
                 eos_token_ids=self.model_config.hf_eos_token_id,
+                verification_proof_to_validate=recv_req.verification_proof_to_validate,
             )
             req.tokenizer = self.tokenizer
 
