@@ -65,6 +65,7 @@ class SchedulerOutputProcessorMixin:
                         )
 
             hidden_state_offset = 0
+            verification_hidden_state_offset = 0
 
             # Check finish conditions
             logprob_pt = 0
@@ -122,19 +123,24 @@ class SchedulerOutputProcessorMixin:
                         )
 
                     if logits_output.verification_hidden_states is not None:
-                        # each item in verification_hidden_states is [N,D] when N is number of tokens
+                        # each item in verification_hidden_states can contain a mixture of sequences for prefill
+                        # this fetches the last token in the sequence
+                        logger.debug(
+                            f"prefill {logits_output.verification_hidden_states.shape}, {logits_output.hidden_states.shape if logits_output.hidden_states is not None else None}, {len(req.origin_input_ids)}"
+                        )
                         verification_hidden_state = (
                             logits_output.verification_hidden_states[i].cpu().clone()
                         )
+                        verification_hidden_state_offset += len(req.origin_input_ids)
                         logger.debug(
-                            f"Verification hidden state in decode step: {verification_hidden_state.shape}"
+                            f"prefill Verification hidden state in decode step: {verification_hidden_state.shape}"
                         )
                         req.verification_hidden_states.append(verification_hidden_state)
                         req.verification_proofs.append(
                             create_toploc_proof(verification_hidden_state)
                         )
                         logger.debug(
-                            f"Added verification proof #{len(req.verification_proofs)} to req (decode)"
+                            f"prefill Added verification proof #{len(req.verification_proofs)} to req (decode)"
                         )
                         if req.verification_proof_to_validate is not None:
                             req.verification_proof_validation_result = (
@@ -144,14 +150,10 @@ class SchedulerOutputProcessorMixin:
                                 )
                             )
                             logger.debug(
-                                f"Verified proof #{len(req.verification_proofs)} in req (decode)"
+                                f"prefill Verified proof #{len(req.verification_proofs)} in req (decode)"
                             )
                     else:
                         logger.debug("No verification hidden states to process")
-
-                        if req.grammar is not None:
-                            req.grammar.accept_token(next_token_id)
-                            req.grammar.finished = req.finished()
                 else:
                     # being chunked reqs' prefill is not finished
                     req.is_chunked -= 1
@@ -287,27 +289,32 @@ class SchedulerOutputProcessorMixin:
 
             if logits_output.verification_hidden_states is not None:
                 # each item in verification_hidden_states is [N,D] when N is number of tokens
-                verification_hidden_state = (
-                    logits_output.verification_hidden_states[i].cpu().clone()
-                )
-                logger.debug(
-                    f"Verification hidden state in prefill step: {verification_hidden_state.shape}"
-                )
-                req.verification_hidden_states.append(verification_hidden_state)
-                req.verification_proofs.append(
-                    create_toploc_proof(verification_hidden_state)
-                )
-                logger.debug(
-                    f"Added verification proof #{len(req.verification_proofs)} to req (prefill)"
-                )
-                if req.verification_proof_to_validate is not None:
-                    req.verification_proof_validation_result = verify_toploc_proof(
-                        verification_hidden_state[-1, ...],  # last token
-                        req.verification_proof_to_validate,
+                if req.finished():
+                    verification_hidden_state = (
+                        logits_output.verification_hidden_states[i].cpu().clone()
                     )
                     logger.debug(
-                        f"Verified proof #{len(req.verification_proofs)} in req (prefill)"
+                        f"Verification hidden state in prefill step: {verification_hidden_state.shape}"
                     )
+                    req.verification_hidden_states.append(verification_hidden_state)
+                    req.verification_proofs.append(
+                        create_toploc_proof(verification_hidden_state)
+                    )
+                    logger.debug(
+                        f"Added verification proof #{len(req.verification_proofs)} to req (prefill)"
+                    )
+                    if req.verification_proof_to_validate is not None:
+                        req.verification_proof_validation_result = verify_toploc_proof(
+                            verification_hidden_state[-1, ...],  # last token
+                            req.verification_proof_to_validate,
+                        )
+                        logger.debug(
+                            f"Verified proof #{len(req.verification_proofs)} in req (prefill)"
+                        )
+                else:
+                    # No need to generate a proof until the last decode step of the sequence
+                    req.verification_hidden_states.append(None)
+                    req.verification_proofs.append(None)
             else:
                 logger.debug("No verification hidden states to process")
 
