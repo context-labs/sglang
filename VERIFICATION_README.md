@@ -11,6 +11,7 @@
 
 ### Fingerprinting
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'background': '#ffffff' }}}%%
 graph TD
     P[Prompt] -->|Input| A[Inference Model]
     A -->|Compute Fingerprint| B[Fingerprint]
@@ -39,7 +40,6 @@ This is what it looks like in the response (called *verification_proofs*):
             "verification_proofs": [
                 "/9nWITn6firYaHRIbYCxYbsuqR/m2RmF7Qsh3Gh1jLATqnNWEQWknWvSHSNXwtxTUQ7tZ4P/GnR1EqsChhMhKm78WNaLsCUBl6ksyhLqPMpYui9zSjfNcafVtYFd836AjagNOVbgiZqj/zQRCXPUhK+orxjTHrhATDqspkJ+LzCzk9JtrK58GD6G5l+HvG73pZlvHNcwDmhkPp5ao8qGToYqxwx/OC88U5ezA3WdrrVha2ZJFA2wlbQqOpE8FY0Po2DrhCHXhnZirWGBuNckB4tpdSnrjdZIi1Pq6iAB7o41i8GUDY99+nk4he8Ceo9afZ4bJL3z9ci/DeeQrsJg07GH"
             ],
-            ...
         }
     }]
 }
@@ -73,6 +73,7 @@ Because we set `max_tokens=0`, the model will perform a "prefill-only", which is
 Internally, it will compare the `verification_proof_to_validate` with its own activations of the last hidden layer of the model after the prefill.
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'background': '#ffffff' }}}%%
 graph
     DB[(Database)] -->|"Retrieve prompt,<br>response, fingerprint"| V[Verification Instance]
     V -->|"Prefill with<br>prompt + response"| H[Hidden Activations]
@@ -141,6 +142,7 @@ Therefore:
 This creates a feedback loop that quickly removes spoofers from the system.
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'background': '#ffffff' }}}%%
 graph TD
     A[More Requests Sent to Verification] --> B[More Spoofs Detected]
     B --> C[Spoofer Probability Increases]
@@ -162,6 +164,7 @@ Models like DeepSeek-V3 use a MOE architecture (Mixture of Experts).  At runtime
 The intermediate results of the experts are combined in a final layer before being sent to the final LM-head.
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'background': '#ffffff' }}}%%
 graph TD
     P[Prompt] --> A[MOE Model]
     A --> Router[Expert Router]
@@ -235,6 +238,7 @@ Instead of fingerprinting the final hidden activations of the model, we can fing
 Then, for verification, we can randomly select one of the 8 experts and run a prefill with just that expert.
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'background': '#ffffff' }}}%%
 graph TD
     DB[(Database)] -->|"Retrieve prompt,<br>response, 8 fingerprints"| V[Verification Process]
     V -->|"Randomly select<br>1 out of 8 fingerprints"| F3[Fingerprint 3]
