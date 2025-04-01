@@ -86,8 +86,6 @@ print("Response received:")
 response_dump = response.model_dump()
 print(json.dumps(response_dump, indent=4))
 
-sys.exit(1)
-
 original_content = response_dump["choices"][0]["message"]["content"]
 last_token_proof = response_dump["choices"][0]["message"]["verification_proofs"][-1]
 
@@ -103,6 +101,7 @@ prefill_response = client.chat.completions.create(
     extra_body={
         "verification_proof_to_validate": last_token_proof,
         "return_input_ids": True,
+        "return_output_ids": True,
     },
 )
 
