@@ -41,19 +41,24 @@ def is_verified(exp_mismatches, mant_err_mean, mant_err_median):
     return exp_mismatches <= 90 and mant_err_mean <= 10.0 and mant_err_median <= 8.0
 
 
-def start_server(model_path):
+def start_server(args, model_path):
     """
     Start the SGL server with TopLoc fingerprint verification enabled
     using the specified model path.
     """
     from sglang.utils import launch_server_cmd
 
+    if args.quiet:
+        MAYBE_NOISY = ""
+    else:
+        MAYBE_NOISY = "--log-level debug"
+
     print(
         f"Starting server with TopLoc fingerprint verification enabled for model: {model_path}..."
     )
     server_process, port = launch_server_cmd(
         f"""
-        python -m sglang.launch_server --model-path {model_path} --host 0.0.0.0 --toploc-fingerprint --log-level debug {MAYBE_DISABLE_CUDA_GRAPH}
+        python -m sglang.launch_server --model-path {model_path} --host 0.0.0.0 --toploc-fingerprint {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
         """
     )
 
@@ -201,6 +206,7 @@ def main():
         default="ultrachat_spoof_verification_results.json",
         help="Output JSON file to store spoofing results",
     )
+    parser.add_argument("--quiet", action="store_true", help="Run in quiet mode")
     parser.add_argument(
         "--model-path",
         type=str,
@@ -233,7 +239,7 @@ def main():
         print(f"Failed to kill GPU processes: {str(e)}")
 
     # Start the server with the specified model
-    server_process, port = start_server(args.model_path)
+    server_process, port = start_server(args, args.model_path)
 
     try:
         # Process the verification results
