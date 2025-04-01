@@ -394,6 +394,7 @@ class ChatCompletionResponse(BaseModel):
     choices: List[ChatCompletionResponseChoice]
     usage: UsageInfo
     input_ids: Optional[List[int]] = None
+    output_ids: Optional[List[int]] = None
 
 
 class DeltaMessage(BaseModel):

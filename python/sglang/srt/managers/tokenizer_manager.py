@@ -928,14 +928,22 @@ class TokenizerManager:
             BatchStrOut, BatchEmbeddingOut, BatchMultimodalOut, BatchTokenIDOut
         ],
     ):
-        # Check if recv_obj has origin_input_ids
+        # Check if recv_obj has origin_input_ids and output_token_ids
         has_origin_input_ids = hasattr(recv_obj, "origin_input_ids")
+        has_output_token_ids = hasattr(recv_obj, "output_token_ids")
+
         logger.debug(
             f"Received batch object with origin_input_ids attribute: {has_origin_input_ids}"
+        )
+        logger.debug(
+            f"Received batch object with output_token_ids attribute: {has_output_token_ids}"
         )
 
         if has_origin_input_ids and recv_obj.origin_input_ids is not None:
             logger.debug(f"origin_input_ids content: {recv_obj.origin_input_ids}")
+
+        if has_output_token_ids and recv_obj.output_token_ids is not None:
+            logger.debug(f"output_token_ids content: {recv_obj.output_token_ids}")
 
         logger.debug(
             f"keys on object: {dir(recv_obj)}, type of object: {type(recv_obj)}"
@@ -962,35 +970,14 @@ class TokenizerManager:
                     logger.debug(f"Adding origin_input_ids to meta_info for rid {rid}")
                     meta_info["origin_input_ids"] = recv_obj.origin_input_ids[i]
 
-            # Debug if we could add origin_input_ids to meta_info
-            if has_origin_input_ids and recv_obj.origin_input_ids is not None:
+            # Add output_token_ids to meta_info if available
+            if has_output_token_ids and recv_obj.output_token_ids is not None:
                 if (
-                    i < len(recv_obj.origin_input_ids)
-                    and recv_obj.origin_input_ids[i] is not None
+                    i < len(recv_obj.output_token_ids)
+                    and recv_obj.output_token_ids[i] is not None
                 ):
-                    logger.debug(
-                        f"For rid {rid}, index {i}, could add origin_input_ids to meta_info: {recv_obj.origin_input_ids[i] is not None}"
-                    )
-                    if recv_obj.origin_input_ids[i] is not None:
-                        logger.debug(
-                            f"Value for rid {rid} would be {recv_obj.origin_input_ids[i][:10]}..."
-                        )
-
-            """
-            # Add origin_input_ids to meta_info if available
-            if hasattr(recv_obj, "origin_input_ids") and recv_obj.origin_input_ids is not None:
-                if i < len(recv_obj.origin_input_ids) and recv_obj.origin_input_ids[i] is not None:
-                    meta_info["origin_input_ids"] = recv_obj.origin_input_ids[i]
-                    logger.debug(f"Added origin_input_ids to meta_info for rid {rid}: {recv_obj.origin_input_ids[i][:10]}...")
-                else:
-                    logger.debug(f"origin_input_ids index {i} is out of range or None for rid {rid}")
-            # Try the backup approach
-            elif hasattr(recv_obj, "_origin_input_ids_dict") and rid in recv_obj._origin_input_ids_dict:
-                meta_info["origin_input_ids"] = recv_obj._origin_input_ids_dict[rid]
-                logger.debug(f"Added origin_input_ids from backup dictionary for rid {rid}: {recv_obj._origin_input_ids_dict[rid][:10]}...")
-            else:
-                logger.debug(f"recv_obj does not have origin_input_ids attribute or it is None for rid {rid}")
-            """
+                    logger.debug(f"Adding output_token_ids to meta_info for rid {rid}")
+                    meta_info["output_token_ids"] = recv_obj.output_token_ids[i]
 
             if getattr(state.obj, "return_logprob", False):
                 self.convert_logprob_style(

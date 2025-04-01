@@ -439,6 +439,8 @@ class BatchTokenIDOut:
 
     # Input IDs / Output IDs
     origin_input_ids: List[List[int]]
+    # The full sequence of output token IDs for each request
+    output_token_ids: List[List[int]]
 
     # Hidden states
     output_hidden_states: List[List[float]]
@@ -500,6 +502,8 @@ class BatchStrOut:
 
     # Origin input ids (for return_input_ids=True)
     origin_input_ids: Optional[List[List[int]]] = None
+    # Output token ids (for return_output_ids=True)
+    output_token_ids: Optional[List[List[int]]] = None
 
 
 @dataclass

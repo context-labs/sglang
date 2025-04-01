@@ -78,7 +78,7 @@ response = client.chat.completions.create(
         {"role": "user", "content": "What is the capital of France?"},
     ],
     **params,
-    extra_body={"return_input_ids": True},
+    extra_body={"return_input_ids": True, "return_output_ids": True},
 )
 
 # Print the response

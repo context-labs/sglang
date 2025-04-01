@@ -1264,6 +1264,7 @@ def v1_chat_generate_response(
         completion_tokens = sum(item["meta_info"]["completion_tokens"] for item in ret)
         cached_tokens = sum(item["meta_info"].get("cached_tokens", 0) for item in ret)
         input_ids = None
+        output_ids = None
 
         logger.debug(f"Creating ChatCompletionResponse with:")
         if hasattr(request, "return_input_ids"):
@@ -1271,17 +1272,33 @@ def v1_chat_generate_response(
         else:
             logger.debug(f"  No return_input_ids attribute on request")
 
+        if hasattr(request, "return_output_ids"):
+            logger.debug(f"  return_output_ids flag: {request.return_output_ids}")
+        else:
+            logger.debug(f"  No return_output_ids attribute on request")
+
         if ret and "origin_input_ids" in ret[0]["meta_info"]:
             logger.debug(f"  Found origin_input_ids in meta_info")
-            logger.debug(f"  meta_info keys: {list(ret[0]['meta_info'].keys())}")
             # Set input_ids from the origin_input_ids in meta_info
             if hasattr(request, "return_input_ids") and request.return_input_ids:
                 input_ids = ret[0]["meta_info"]["origin_input_ids"]
                 logger.debug(f"  Setting input_ids to: {input_ids[:10]}... (truncated)")
         else:
             logger.debug(f"  No origin_input_ids in meta_info")
-            if ret:
-                logger.debug(f"  meta_info keys: {list(ret[0]['meta_info'].keys())}")
+
+        if ret and "output_token_ids" in ret[0]["meta_info"]:
+            logger.debug(f"  Found output_token_ids in meta_info")
+            # Set output_ids from the output_token_ids in meta_info
+            if hasattr(request, "return_output_ids") and request.return_output_ids:
+                output_ids = ret[0]["meta_info"]["output_token_ids"]
+                logger.debug(
+                    f"  Setting output_ids to: {output_ids[:10]}... (truncated)"
+                )
+        else:
+            logger.debug(f"  No output_token_ids in meta_info")
+
+        if ret:
+            logger.debug(f"  meta_info keys: {list(ret[0]['meta_info'].keys())}")
 
         response = ChatCompletionResponse(
             id=ret[0]["meta_info"]["id"],
@@ -1296,6 +1313,7 @@ def v1_chat_generate_response(
                 ),
             ),
             input_ids=input_ids,
+            output_ids=output_ids,  # Add output_ids to the response
         )
         return response
 

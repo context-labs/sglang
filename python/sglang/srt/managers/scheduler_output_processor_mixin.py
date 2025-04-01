@@ -527,6 +527,7 @@ class SchedulerOutputProcessorMixin:
         verification_proofs = None
         verification_proof_validation_results = None
         origin_input_ids = []
+        output_token_ids = []
 
         if return_logprob:
             input_token_logprobs_val = []
@@ -645,8 +646,16 @@ class SchedulerOutputProcessorMixin:
                 else:
                     origin_input_ids.append([])
 
+                if hasattr(req, "output_ids") and req.output_ids is not None:
+                    output_token_ids.append(list(req.output_ids))
+                else:
+                    output_token_ids.append([])
+
         logger.debug(
             f" just prior to batch_out creation origin_input_ids: {origin_input_ids}"
+        )
+        logger.debug(
+            f" just prior to batch_out creation output_token_ids: {output_token_ids}"
         )
 
         # Send to detokenizer
@@ -681,6 +690,7 @@ class SchedulerOutputProcessorMixin:
                 output_token_ids_logprobs_val,
                 output_token_ids_logprobs_idx,
                 origin_input_ids,
+                output_token_ids,
                 output_hidden_states,
                 verification_proofs,
                 verification_proof_validation_results,

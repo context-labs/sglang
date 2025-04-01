@@ -233,6 +233,7 @@ class DetokenizerManager:
             verification_proofs=recv_obj.verification_proofs,
             verification_proof_validation_results=recv_obj.verification_proof_validation_results,
             origin_input_ids=recv_obj.origin_input_ids,
+            output_token_ids=recv_obj.output_token_ids,  # Copy output_token_ids from BatchTokenIDOut
         )
 
     def handle_multimodal_decode_req(self, recv_obj: BatchMultimodalDecodeReq):
