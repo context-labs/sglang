@@ -107,16 +107,21 @@ def load_ultrachat_samples(dataset_path, seed, num_samples=10):
     return samples
 
 
-def start_server():
+def start_server(args):
     """
     Start the SGL server with TopLoc fingerprint verification enabled.
     """
     from sglang.utils import launch_server_cmd
 
     print("Starting server with TopLoc fingerprint verification enabled...")
+    if args.quiet:
+        MAYBE_NOISY = ""
+    else:
+        MAYBE_NOISY = "--log-level debug"
+
     server_process, port = launch_server_cmd(
         f"""
-        python -m sglang.launch_server --model-path meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --toploc-fingerprint --log-level debug {MAYBE_DISABLE_CUDA_GRAPH}
+        python -m sglang.launch_server --model-path meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --toploc-fingerprint {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
         """
     )
 
@@ -275,6 +280,7 @@ def main():
     parser.add_argument(
         "--num-samples", type=int, default=10, help="Number of samples to process"
     )
+    parser.add_argument("--quiet", action="store_true", help="Run in quiet mode")
     parser.add_argument(
         "--output",
         type=str,
@@ -303,7 +309,7 @@ def main():
     samples = load_ultrachat_samples(dataset_path, args.seed, args.num_samples)
 
     # Start server
-    server_process, port = start_server()
+    server_process, port = start_server(args)
 
     try:
         # Process samples
