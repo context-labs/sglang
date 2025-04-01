@@ -14,6 +14,9 @@ from tqdm import tqdm
 
 from sglang.utils import print_highlight, terminate_process, wait_for_server
 
+# Runs without toploc to check if speed is affected
+
+
 DISABLE_CUDA_GRAPH = True
 MAYBE_DISABLE_CUDA_GRAPH = "--disable-cuda-graph" if DISABLE_CUDA_GRAPH else ""
 
@@ -48,12 +51,10 @@ def load_ultrachat_samples(dataset_path, seed, num_samples=10):
     Load samples from the UltraChat dataset.
     Specifically reads the first n lines from train_0.jsonl in a streaming fashion.
     Each line in the jsonl file contains a JSON array, and we use the first item as the prompt.
-
     Args:
         dataset_path: Path to the UltraChat dataset
         seed: Random seed (not used in this implementation)
         num_samples: Number of samples to extract
-
     Returns:
         List of samples with ID and prompt
     """
@@ -116,7 +117,7 @@ def start_server():
     print("Starting server with TopLoc fingerprint verification enabled...")
     server_process, port = launch_server_cmd(
         f"""
-        python -m sglang.launch_server --model-path meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --toploc-fingerprint --log-level debug {MAYBE_DISABLE_CUDA_GRAPH}
+        python -m sglang.launch_server --model-path meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --log-level debug {MAYBE_DISABLE_CUDA_GRAPH}
         """
     )
 
@@ -177,19 +178,15 @@ def process_samples(samples, port, seed, output_json):
                     {"role": "user", "content": prompt},
                 ],
                 **params,
-                extra_body={"return_verification_proofs": True},
+                # extra_body={"return_verification_proofs": True},
             )
 
             # Get the response and last token proof
             response_dump = response.model_dump()
-
-            print("Response received:")
-            print(json.dumps(response_dump, indent=4))
-
             original_content = response_dump["choices"][0]["message"]["content"]
-            last_token_proof = response_dump["choices"][0]["message"][
-                "verification_proofs"
-            ][-1]
+            # last_token_proof = response_dump["choices"][0]["message"][
+            #    "verification_proofs"
+            # ][-1]
 
             # Create verification request
             prefill_response = client.chat.completions.create(
@@ -200,13 +197,13 @@ def process_samples(samples, port, seed, output_json):
                 ],
                 max_tokens=0,
                 **params,
-                extra_body={
-                    "verification_proof_to_validate": last_token_proof,
-                },
+                # extra_body={
+                #    "verification_proof_to_validate": last_token_proof,
+                # },
             )
 
             prefill_dump = prefill_response.model_dump()
-
+            """
             # Parse verification result
             validation_result = json.loads(
                 prefill_dump["choices"][0]["message"][
@@ -237,28 +234,10 @@ def process_samples(samples, port, seed, output_json):
             print(
                 f"Processed sample {sample_id}: {'Verified' if verified else 'Not Verified'}"
             )
+            """
 
         except Exception as e:
             print(f"Error processing sample {sample_id}: {str(e)}")
-            # Add error record to results
-            results.append(
-                {
-                    "ultrachat_filepath": str(sample["ultrachat_filepath"]),
-                    "ultrachat_id": sample_id,
-                    "prompt": prompt if isinstance(prompt, str) else "ERROR",
-                    "response": "ERROR",
-                    "last_token_proof": "???",
-                    "exp_mismatches": "ERROR",
-                    "mant_err_mean": "ERROR",
-                    "mant_err_median": "ERROR",
-                    "verified": False,
-                }
-            )
-
-    # Save results to JSON file
-    with open(output_json, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=4)
-    print(f"Results saved to {output_json}")
 
 
 def main():
