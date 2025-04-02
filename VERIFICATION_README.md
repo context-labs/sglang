@@ -1,6 +1,11 @@
 # Verification
+
 **Goal**: Automatically detect and flag "spoofed inferences".
+
+**Business Value**: Prevents fraud and ensures the quality of the service.
+
 **Constraints**: Low error rate, minimal speed impact.
+
 **Approach**:
 
 1. During inference, compute a "fingerprint" of the internal activations of the model.
@@ -8,6 +13,11 @@
 3. Later, the system sends the prompt, response, and fingerprint to a "verification instance".
 4. The verification instance concatenates the prompt and response, and "prefills" the model with this text.
 5. If the fingerprint matches the activations of the verification model (within tolerances), the response is valid.
+
+**Answers one simple question**: **"Did you use the model you say you did to generate this response?"**
+
+### Also...
+I'll cover a reputation update system that only slashes operators when it's "reasonably sure" they're a spoofer (taking into account the False Negative Rate).
 
 ### Fingerprinting
 ```mermaid
