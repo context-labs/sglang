@@ -40,7 +40,6 @@ import triton.language as tl
 
 from sglang.srt.layers.rotary_embedding import MRotaryEmbedding
 from sglang.srt.utils import get_compiler_backend
-from sglang.srt.verification.verification_info import VerificationAlgorithm
 
 if TYPE_CHECKING:
     from sglang.srt.layers.attention.base_attn_backend import AttentionBackend
@@ -219,7 +218,7 @@ class ForwardBatch:
     capture_hidden_mode: CaptureHiddenMode = None
 
     # Verification algorithm
-    verification_algorithm: VerificationAlgorithm = None
+    toploc_fingerprint: bool = False
 
     # For padding
     padded_static_len: int = -1  # -1 if not padded
@@ -227,8 +226,8 @@ class ForwardBatch:
     # For Qwen2-VL
     mrope_positions: torch.Tensor = None
 
-    # Verification proof to validate
-    verification_proofs_to_validate: Optional[List[str]] = None
+    # Verification fingerprint to validate
+    toploc_verification_fingerprints_to_validate: Optional[List[str]] = None
 
     @classmethod
     def init_new(
@@ -269,8 +268,8 @@ class ForwardBatch:
             capture_hidden_mode=batch.capture_hidden_mode,
             input_embeds=batch.input_embeds,
             extend_input_logprob_token_ids_gpu=extend_input_logprob_token_ids_gpu,
-            verification_algorithm=batch.verification_algorithm,
-            verification_proofs_to_validate=batch.verification_proofs_to_validate,
+            toploc_verification=batch.toploc_verification,
+            toploc_verification_fingerprints_to_validate=batch.toploc_verification_fingerprints_to_validate,
         )
 
         # For DP attention

@@ -39,10 +39,8 @@ from sglang.srt.model_executor.forward_batch_info import (
     CaptureHiddenMode,
     ForwardBatch,
     ForwardMode,
-    VerificationAlgorithm,
 )
 from sglang.srt.utils import dump_to_file
-from sglang.srt.verification.verification_info import VerificationAlgorithm
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +54,8 @@ class LogitsProcessorOutput:
     # The last hidden layers
     hidden_states: Optional[torch.Tensor] = None
 
-    # Used to generate verification proof strings, aka "fingerprints"
-    verification_hidden_states: Optional[torch.Tensor] = None
+    # Captured hidden states for the purposes of generating and validating TopLOC "fingerprints", aka "fingerprints"
+    toploc_verification_hidden_states: Optional[torch.Tensor] = None
 
     ## Part 2: This part will be assigned in python/sglang/srt/layers/sampler.py::Sampler
     # The logprobs of the next tokens.                              shape: [#seq]
@@ -84,7 +82,7 @@ class LogitsProcessorOutput:
 class LogitsMetadata:
     forward_mode: ForwardMode
     capture_hidden_mode: CaptureHiddenMode = CaptureHiddenMode.NULL
-    verification_algorithm: VerificationAlgorithm = VerificationAlgorithm.NONE
+    toploc_verification: bool = False
     extend_return_logprob: bool = False
     extend_return_top_logprob: bool = False
     extend_token_ids_logprob: bool = False
@@ -148,7 +146,7 @@ class LogitsMetadata:
         return cls(
             forward_mode=forward_batch.forward_mode,
             capture_hidden_mode=forward_batch.capture_hidden_mode,
-            verification_algorithm=forward_batch.verification_algorithm,
+            toploc_verification=forward_batch.toploc_verification,
             extend_return_logprob=extend_return_logprob,
             extend_return_top_logprob=extend_return_top_logprob,
             extend_token_ids_logprob=extend_token_ids_logprob,
@@ -197,17 +195,7 @@ class LogitsMetadata:
         self.gathered_buffer = gathered_buffer
 
     def is_toploc_enabled(self) -> bool:
-        """Check if TopLoc verification is enabled either through algorithm or server args"""
-        # First check the verification algorithm attribute
-        if (
-            hasattr(self, "verification_algorithm")
-            and self.verification_algorithm
-            and self.verification_algorithm.is_toploc()
-        ):
-            return True
-
-        # Fallback to checking the global server args
-        return global_server_args_dict.get("toploc_fingerprint", False)
+        return global_server_args_dict.get("toploc_verification", False)
 
 
 class LogitsProcessor(nn.Module):
@@ -366,43 +354,20 @@ class LogitsProcessor(nn.Module):
             else:
                 assert False, "Should never reach"
 
-        """
-            Regardless of capture mode, if we are performing verification, we want to capture hidden states
-            Now:
-                - The hidden states have a flattened dimension N which can represent many tokens across different sequences
-                - Which tokens belong to which sequences is in `logits_metadata`
-                - The `pruned_states` contains the "last token" of each sequence - therefore it selects some tokens out of the flattened dimension N
-                - The `sample_indices` further selects some tokens from the `pruned_states` based on "what tokens we are actually sampling" (details hazy to me)
-            We want to use the `pruned_states` because:
-                (1) In the case of a decode step (which is generating a next token), every token is the "last" because it is "the next token" (i assume target_verify is the same)
-                (2) In the case of a an extend step, we are prefilling, so `pruned_states` contains the last token of each sequence for its N dimension
-                (3) If we are `extend_log_prob`ing, I don't quite understand the logic of which things get to be pruned states.  i will have to revisit this.
-        """
-        verification_hidden_states_to_store: Optional[torch.Tensor] = None
+        # If toploc is enabled, capture pruned hidden states
+        toploc_verification_hidden_states_to_store: Optional[torch.Tensor] = None
         if logits_metadata.is_toploc_enabled():
-            logger.debug(
-                f"Capturing TopLoc verification hidden states with shape {pruned_states.shape if pruned_states is not None else 'None'}"
-            )
-            verification_hidden_states_to_store = (
+            toploc_verification_hidden_states_to_store = (
                 pruned_states[sample_indices] if sample_indices else pruned_states
             )
 
         if not logits_metadata.extend_return_logprob:
             # Decode mode or extend mode without return_logprob.
 
-            if verification_hidden_states_to_store is not None:
-                logger.debug(
-                    f"(A) Returning logits processor output with verification hidden states: {verification_hidden_states_to_store.shape}"
-                )
-            else:
-                logger.debug(
-                    "(A) Returning logits processor output without verification hidden states"
-                )
-
             return LogitsProcessorOutput(
                 next_token_logits=sampled_logits,
                 hidden_states=hidden_states_to_store,
-                verification_hidden_states=verification_hidden_states_to_store,
+                toploc_verification_hidden_states=toploc_verification_hidden_states_to_store,
             )
         else:
             input_logprobs = logits[input_logprob_indices]
@@ -450,22 +415,13 @@ class LogitsProcessor(nn.Module):
                 logits_metadata.extend_input_logprob_token_ids_gpu,
             ]
 
-            if verification_hidden_states_to_store is not None:
-                logger.debug(
-                    f"(B) Returning logits processor output with verification hidden states: {verification_hidden_states_to_store.shape}"
-                )
-            else:
-                logger.debug(
-                    "(B) Returning logits processor output without verification hidden states"
-                )
-
             return LogitsProcessorOutput(
                 next_token_logits=sampled_logits,
                 input_token_logprobs=input_token_logprobs,
                 input_top_logprobs_val=input_top_logprobs_val,
                 input_top_logprobs_idx=input_top_logprobs_idx,
                 hidden_states=hidden_states_to_store,
-                verification_hidden_states=verification_hidden_states_to_store,
+                toploc_verification_hidden_states=toploc_verification_hidden_states_to_store,
                 input_token_ids_logprobs_val=input_token_ids_logprobs_val,
                 input_token_ids_logprobs_idx=input_token_ids_logprobs_idx,
             )

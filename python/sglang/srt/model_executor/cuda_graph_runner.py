@@ -569,20 +569,11 @@ class CudaGraphRunner:
             hidden_states[: self.raw_num_token] if hidden_states is not None else None
         )
 
-        if hidden_states is not None:
-            logger.debug(
-                f"(C) Returning logits processor output with verification hidden states: {hidden_states.shape}"
-            )
-        else:
-            logger.debug(
-                "(C) Returning logits processor output without verification hidden states"
-            )
-
         logits_output = LogitsProcessorOutput(
             next_token_logits=next_token_logits[: self.raw_num_token],
             hidden_states=hidden_states,
             # Because CUDA_GRAPH only runs in DECODE mode, every n in N for [N,hidden_dimension] is a "last token"
-            verification_hidden_states=hidden_states,
+            toploc_verification_hidden_states=hidden_states,
         )
         return logits_output
 

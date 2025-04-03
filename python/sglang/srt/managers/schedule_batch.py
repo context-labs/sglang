@@ -54,7 +54,6 @@ from sglang.srt.utils import get_compiler_backend
 if TYPE_CHECKING:
     from sglang.srt.speculative.eagle_utils import EagleDraftInput, EagleVerifyInput
     from sglang.srt.speculative.spec_info import SpeculativeAlgorithm
-    from sglang.srt.verification.verification_info import VerificationAlgorithm
 
 INIT_INCREMENTAL_DETOKENIZATION_OFFSET = 5
 
@@ -77,7 +76,7 @@ global_server_args_dict = {
     "disable_radix_cache": ServerArgs.disable_radix_cache,
     "flashinfer_mla_disable_ragged": ServerArgs.flashinfer_mla_disable_ragged,
     "toploc_verification_topk": ServerArgs.toploc_verification_topk,
-    "toploc_fingerprint": ServerArgs.toploc_fingerprint,
+    "toploc_verification": ServerArgs.toploc_verification,
 }
 
 logger = logging.getLogger(__name__)
@@ -271,7 +270,7 @@ class Req:
         custom_logit_processor: Optional[str] = None,
         return_hidden_states: bool = False,
         eos_token_ids: Optional[Set[int]] = None,
-        verification_proof_to_validate: Optional[str] = None,
+        toploc_verification_fingerprint_to_validate: Optional[str] = None,
     ):
         # Input and output info
         self.rid = rid
@@ -313,13 +312,15 @@ class Req:
         self.stream = stream
         self.eos_token_ids = eos_token_ids
 
-        # Proof generation (input)
-        self.verification_hidden_states = []
-        self.verification_proofs = []
+        # TopLOC generation (input)
+        self.toploc_verification_hidden_states = []
+        self.toploc_verification_fingerprints = []
 
-        # Proof verification (output)
-        self.verification_proof_to_validate = verification_proof_to_validate
-        self.verification_proof_validation_result = None
+        # TopLOC verification (output)
+        self.toploc_verification_fingerprint_to_validate = (
+            toploc_verification_fingerprint_to_validate
+        )
+        self.toploc_verification_fingerprint_validation_result = None
 
         # For incremental decoding
         # ----- | --------- read_ids -------|
@@ -620,7 +621,7 @@ class ScheduleBatch:
     spec_info: Optional[Union[EagleDraftInput, EagleVerifyInput]] = None
 
     # Verification
-    verification_algorithm: VerificationAlgorithm = None
+    toploc_verification: bool = False
 
     # Enable custom logit processor
     enable_custom_logit_processor: bool = False
@@ -638,7 +639,7 @@ class ScheduleBatch:
         model_config: ModelConfig,
         enable_overlap: bool,
         spec_algorithm: SpeculativeAlgorithm,
-        verification_algorithm: VerificationAlgorithm,
+        toploc_verification: bool,
         enable_custom_logit_processor: bool = False,
     ):
         return_logprob = any(req.return_logprob for req in reqs)
@@ -655,7 +656,7 @@ class ScheduleBatch:
             has_grammar=any(req.grammar for req in reqs),
             device=req_to_token_pool.device,
             spec_algorithm=spec_algorithm,
-            verification_algorithm=verification_algorithm,
+            toploc_verification=toploc_verification,
             enable_custom_logit_processor=enable_custom_logit_processor,
             return_hidden_states=any(req.return_hidden_states for req in reqs),
         )
@@ -1341,20 +1342,16 @@ class ScheduleBatch:
             )
         )
 
-        # Ensure CAPTURE_HIDDEN_MODE is *at least* LAST if toploc fingerprinting is enabled
+        # Ensure CAPTURE_HIDDEN_MODE is *at least* LAST if toploc verification is enabled
         if (
-            global_server_args_dict["toploc_fingerprint"]
+            global_server_args_dict["toploc_verification"]
             and capture_hidden_mode == CaptureHiddenMode.NULL
         ):
             capture_hidden_mode = CaptureHiddenMode.LAST
 
-        verification_proofs_to_validate = [
-            r.verification_proof_to_validate for r in self.reqs
+        toploc_verification_fingerprints_to_validate = [
+            r.toploc_verification_fingerprint_to_validate for r in self.reqs
         ]
-
-        logger.debug(
-            f"vptv when constructing ModelWorkerBatch: {verification_proofs_to_validate}"
-        )
 
         return ModelWorkerBatch(
             bid=bid,
@@ -1385,10 +1382,10 @@ class ScheduleBatch:
             input_embeds=self.input_embeds,
             spec_algorithm=self.spec_algorithm,
             spec_info=self.spec_info,
-            verification_algorithm=self.verification_algorithm,
+            toploc_verification=self.toploc_verification,
             capture_hidden_mode=capture_hidden_mode,
             extend_input_logprob_token_ids=self.extend_input_logprob_token_ids,
-            verification_proofs_to_validate=verification_proofs_to_validate,
+            toploc_verification_fingerprints_to_validate=toploc_verification_fingerprints_to_validate,
         )
 
     def copy(self):
@@ -1401,7 +1398,7 @@ class ScheduleBatch:
             return_logprob=self.return_logprob,
             decoding_reqs=self.decoding_reqs,
             spec_algorithm=self.spec_algorithm,
-            verification_algorithm=self.verification_algorithm,
+            toploc_verification=self.toploc_verification,
             enable_custom_logit_processor=self.enable_custom_logit_processor,
         )
 
@@ -1471,11 +1468,11 @@ class ModelWorkerBatch:
     # Speculative decoding
     spec_algorithm: SpeculativeAlgorithm = None
     spec_info: Optional[Union[EagleVerifyInput, EagleDraftInput]] = None
-    verification_algorithm: VerificationAlgorithm = None
+    toploc_verification: bool = False
     # If set, the output of the batch contains the hidden states of the run.
     capture_hidden_mode: CaptureHiddenMode = None
-    # Verification proofs to validate
-    verification_proofs_to_validate: Optional[List[VerificationProof]] = None
+    # TopLOC Verification fingerprints to validate
+    toploc_verification_fingerprints_to_validate: Optional[List[str]] = None
 
 
 @triton.jit

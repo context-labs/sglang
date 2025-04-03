@@ -73,8 +73,8 @@ class GenerateReqInput:
     # Session info for continual prompting
     session_params: Optional[Union[List[Dict], Dict]] = None
 
-    # Verification proofs to validate against activations
-    verification_proof_to_validate: Optional[Union[List[str], str]] = None
+    # TopLOC Verification fingerprints to validate against activations
+    toploc_verification_fingerprint_to_validate: Optional[Union[List[str], str]] = None
 
     # Custom logit processor for advanced sampling control. Must be a serialized instance
     # of `CustomLogitProcessor` in python/sglang/srt/sampling/custom_logit_processor.py
@@ -230,7 +230,6 @@ class GenerateReqInput:
         return self.rid
 
     def __getitem__(self, i):
-        logger.debug("In __getitem__ of GenerateReqInput")
         return GenerateReqInput(
             text=self.text[i] if self.text is not None else None,
             input_ids=self.input_ids[i] if self.input_ids is not None else None,
@@ -252,9 +251,9 @@ class GenerateReqInput:
                 else None
             ),
             return_hidden_states=self.return_hidden_states,
-            verification_proof_to_validate=(
-                self.verification_proof_to_validate[i]
-                if self.verification_proof_to_validate is not None
+            toploc_verification_fingerprint_to_validate=(
+                self.toploc_verification_fingerprint_to_validate[i]
+                if self.toploc_verification_fingerprint_to_validate is not None
                 else None
             ),
         )
@@ -299,8 +298,8 @@ class TokenizedGenerateReqInput:
     # Whether to return hidden states
     return_hidden_states: bool = False
 
-    # Verification proofs to validate
-    verification_proof_to_validate: Optional[str] = None
+    # TopLOC Verification fingerprints to validate
+    toploc_verification_fingerprint_to_validate: Optional[str] = None
 
 
 @dataclass
@@ -445,9 +444,9 @@ class BatchTokenIDOut:
     # Hidden states
     output_hidden_states: List[List[float]]
 
-    # Verification proofs
-    verification_proofs: List[List]
-    verification_proof_validation_results: List[Optional[str]] = None
+    # TopLOC Verification fingerprints
+    toploc_verification_fingerprints: List[List]
+    toploc_verification_fingerprint_validation_results: List[Optional[str]] = None
 
 
 @dataclass
@@ -496,9 +495,9 @@ class BatchStrOut:
     # Hidden states
     output_hidden_states: List[List[float]]
 
-    # Verification proofs
-    verification_proofs: List[List]
-    verification_proof_validation_results: List[Optional[str]] = None
+    # TopLOC Verification fingerprints
+    toploc_verification_fingerprints: List[List]
+    toploc_verification_fingerprint_validation_results: List[Optional[str]] = None
 
     # Origin input ids (for return_input_ids=True)
     origin_input_ids: Optional[List[List[int]]] = None

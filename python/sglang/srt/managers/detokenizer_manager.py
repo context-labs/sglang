@@ -230,8 +230,8 @@ class DetokenizerManager:
             output_token_ids_logprobs_val=recv_obj.output_token_ids_logprobs_val,
             output_token_ids_logprobs_idx=recv_obj.output_token_ids_logprobs_idx,
             output_hidden_states=recv_obj.output_hidden_states,
-            verification_proofs=recv_obj.verification_proofs,
-            verification_proof_validation_results=recv_obj.verification_proof_validation_results,
+            toploc_verification_fingerprints=recv_obj.toploc_verification_fingerprints,
+            toploc_verification_fingerprint_validation_results=recv_obj.toploc_verification_fingerprint_validation_results,
             origin_input_ids=recv_obj.origin_input_ids,
             output_token_ids=recv_obj.output_token_ids,  # Copy output_token_ids from BatchTokenIDOut
         )

@@ -136,7 +136,7 @@ class Session:
             return_logprob=req.return_logprob,
             top_logprobs_num=req.top_logprobs_num,
             token_ids_logprob=req.token_ids_logprob,
-            verification_proof_to_validate=req.verification_proof_to_validate,
+            toploc_verification_fingerprint_to_validate=req.toploc_verification_fingerprint_to_validate,
             # return_hidden_states=req.return_hidden_states, # TODO: this as well?
         )
         if last_req is not None:

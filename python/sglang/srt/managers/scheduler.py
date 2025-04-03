@@ -113,7 +113,6 @@ from sglang.srt.utils import (
     set_random_seed,
     suppress_other_loggers,
 )
-from sglang.srt.verification.verification_info import VerificationAlgorithm
 from sglang.utils import TypeBasedDispatcher, get_exception_traceback
 
 logger = logging.getLogger(__name__)
@@ -163,11 +162,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
         self.spec_algorithm = SpeculativeAlgorithm.from_string(
             server_args.speculative_algorithm
         )
-        self.verification_algorithm = (
-            VerificationAlgorithm.TOPLOC
-            if server_args.toploc_fingerprint
-            else VerificationAlgorithm.NONE
-        )
+        self.toploc_verification = server_args.toploc_verification
         self.gpu_id = gpu_id
         self.enable_hierarchical_cache = server_args.enable_hierarchical_cache
         self.page_size = server_args.page_size
@@ -659,10 +654,6 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 )
                 custom_logit_processor = None
 
-            logger.debug(
-                f"Adding req with verification_proof_to_validate vptv: {recv_req.verification_proof_to_validate}"
-            )
-
             req = Req(
                 recv_req.rid,
                 recv_req.input_text,
@@ -677,7 +668,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 custom_logit_processor=custom_logit_processor,
                 return_hidden_states=recv_req.return_hidden_states,
                 eos_token_ids=self.model_config.hf_eos_token_id,
-                verification_proof_to_validate=recv_req.verification_proof_to_validate,
+                toploc_verification_fingerprint_to_validate=recv_req.toploc_verification_fingerprint_to_validate,
             )
             req.tokenizer = self.tokenizer
 
@@ -1146,7 +1137,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
             self.model_config,
             self.enable_overlap,
             self.spec_algorithm,
-            self.verification_algorithm,
+            self.toploc_verification,
             self.server_args.enable_custom_logit_processor,
         )
         new_batch.prepare_for_extend()
@@ -1378,7 +1369,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
             self.model_config,
             self.enable_overlap,
             self.spec_algorithm,
-            self.verification_algorithm,
+            self.toploc_verification,
             self.server_args.enable_custom_logit_processor,
         )
         idle_batch.prepare_for_idle()

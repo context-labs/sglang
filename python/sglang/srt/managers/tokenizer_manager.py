@@ -328,10 +328,6 @@ class TokenizerManager:
                 "Please add `--is-embedding` when launching the server or try another model."
             )
 
-        logger.debug(
-            f"In generate_request (pre normalization), vptv: {obj.verification_proof_to_validate if hasattr(obj, 'verification_proof_to_validate') else None}"
-        )
-
         obj.normalize_batch_and_arguments()
 
         if self.log_requests:
@@ -339,10 +335,6 @@ class TokenizerManager:
             logger.info(
                 f"Receive: obj={dataclass_to_string_truncated(obj, max_length, skip_names=skip_names)}"
             )
-
-        logger.debug(
-            f"In generate_request (post normalization), vptv: {obj.verification_proof_to_validate if hasattr(obj, 'verification_proof_to_validate') else None}"
-        )
 
         async with self.model_update_lock.reader_lock:
             is_single = obj.is_single
@@ -365,10 +357,6 @@ class TokenizerManager:
         # Tokenize
         input_embeds = None
         input_text = obj.text
-
-        logger.debug(
-            f"In _tokenize_one_request, vptv: {obj.verification_proof_to_validate if hasattr(obj, 'verification_proof_to_validate') else None}"
-        )
 
         if obj.input_embeds is not None:
             if not self.server_args.disable_radix_cache:
@@ -449,7 +437,7 @@ class TokenizerManager:
                 session_params=session_params,
                 custom_logit_processor=obj.custom_logit_processor,
                 return_hidden_states=obj.return_hidden_states,
-                verification_proof_to_validate=obj.verification_proof_to_validate,
+                toploc_verification_fingerprint_to_validate=obj.toploc_verification_fingerprint_to_validate,
             )
         elif isinstance(obj, EmbeddingReqInput):
             tokenized_obj = TokenizedEmbeddingReqInput(
@@ -536,13 +524,6 @@ class TokenizerManager:
         created_time: Optional[float] = None,
     ):
         batch_size = obj.batch_size
-
-        logger.debug(
-            f"In _handle_batch_request, vptv: {obj.verification_proof_to_validate if hasattr(obj, 'verification_proof_to_validate') else None}"
-        )
-        logger.debug(
-            f"... at index 0: {obj[0].verification_proof_to_validate if hasattr(obj[0], 'verification_proof_to_validate') else None}"
-        )
 
         generators = []
         rids = []
@@ -898,27 +879,6 @@ class TokenizerManager:
 
         while True:
             recv_obj = await self.recv_from_detokenizer.recv_pyobj()
-            # Log whether verification_proofs is in the received object
-            if isinstance(recv_obj, BatchTokenIDOut):
-                logger.debug(
-                    f"BatchTokenIDOut received, has verification_proofs: {hasattr(recv_obj, 'verification_proofs')}"
-                )
-                logger.debug(
-                    f"BatchTokenIDOut verification_proofs content: {getattr(recv_obj, 'verification_proofs', None)}"
-                )
-                logger.debug(
-                    f"BatchTokenIDOut origin_input_ids content: {getattr(recv_obj, 'origin_input_ids', None)}"
-                )
-            elif isinstance(recv_obj, BatchStrOut):
-                logger.debug(
-                    f"BatchStrOut received, has verification_proofs: {hasattr(recv_obj, 'verification_proofs')}"
-                )
-                logger.debug(
-                    f"BatchStrOut origin_input_ids attribute exists: {hasattr(recv_obj, 'origin_input_ids')}"
-                )
-                logger.debug(
-                    f"BatchStrOut origin_input_ids content: {getattr(recv_obj, 'origin_input_ids', None)}"
-                )
             self._result_dispatcher(recv_obj)
             self.last_receive_tstamp = time.time()
 
@@ -931,23 +891,6 @@ class TokenizerManager:
         # Check if recv_obj has origin_input_ids and output_token_ids
         has_origin_input_ids = hasattr(recv_obj, "origin_input_ids")
         has_output_token_ids = hasattr(recv_obj, "output_token_ids")
-
-        logger.debug(
-            f"Received batch object with origin_input_ids attribute: {has_origin_input_ids}"
-        )
-        logger.debug(
-            f"Received batch object with output_token_ids attribute: {has_output_token_ids}"
-        )
-
-        if has_origin_input_ids and recv_obj.origin_input_ids is not None:
-            logger.debug(f"origin_input_ids content: {recv_obj.origin_input_ids}")
-
-        if has_output_token_ids and recv_obj.output_token_ids is not None:
-            logger.debug(f"output_token_ids content: {recv_obj.output_token_ids}")
-
-        logger.debug(
-            f"keys on object: {dir(recv_obj)}, type of object: {type(recv_obj)}"
-        )
 
         for i, rid in enumerate(recv_obj.rids):
             state = self.rid_to_state.get(rid, None)
@@ -1000,56 +943,46 @@ class TokenizerManager:
             if getattr(recv_obj, "output_hidden_states", None):
                 meta_info["hidden_states"] = recv_obj.output_hidden_states[i]
 
-            # Add verification proofs to meta_info if they exist
-            if getattr(recv_obj, "verification_proofs", None) is not None:
+            # Add toploc verification fingerprints to meta_info if they exist
+            if getattr(recv_obj, "toploc_verification_fingerprints", None) is not None:
                 try:
-                    # Make sure verification_proofs is properly extracted and formatted
-                    if i < len(recv_obj.verification_proofs):
-                        proofs = recv_obj.verification_proofs[i]
-                        logger.debug(
-                            f"Adding verification proofs to meta_info for rid {rid}: {len(proofs)} proofs"
-                        )
-                        meta_info["verification_proofs"] = proofs
+                    # Make sure toploc_verification_fingerprints is properly extracted and formatted
+                    if i < len(recv_obj.toploc_verification_fingerprints):
+                        fingerprints = recv_obj.toploc_verification_fingerprints[i]
+                        meta_info["toploc_verification_fingerprints"] = fingerprints
                     else:
                         logger.warning(
-                            f"verification_proofs index {i} out of range (len={len(recv_obj.verification_proofs)})"
-                        )
-                except Exception as e:
-                    logger.error(f"Error processing verification proofs: {e}")
-            else:
-                logger.debug(
-                    f"No verification_proofs attribute on recv_obj for rid {rid}"
-                )
-
-            # Add verification proof validation results to meta_info if they exist
-            if (
-                getattr(recv_obj, "verification_proof_validation_results", None)
-                is not None
-            ):
-                try:
-                    # Make sure verification_proof_validation_results is properly extracted and formatted
-                    if i < len(recv_obj.verification_proof_validation_results):
-                        validation_result = (
-                            recv_obj.verification_proof_validation_results[i]
-                        )
-                        logger.debug(
-                            f"Adding verification proof validation result to meta_info for rid {rid}: {validation_result}"
-                        )
-                        meta_info["verification_proof_validation_result"] = (
-                            validation_result
-                        )
-                    else:
-                        logger.warning(
-                            f"verification_proof_validation_results index {i} out of range (len={len(recv_obj.verification_proof_validation_results)})"
+                            f"toploc_verification_fingerprints index {i} out of range (len={len(recv_obj.toploc_verification_fingerprints)})"
                         )
                 except Exception as e:
                     logger.error(
-                        f"Error processing verification proof validation results: {e}"
+                        f"Error processing toploc verification fingerprints: {e}"
                     )
-            else:
-                logger.debug(
-                    f"No verification_proof_validation_results attribute on recv_obj for rid {rid}"
+
+            # Add toploc verification fingerprint validation results to meta_info if they exist
+            if (
+                getattr(
+                    recv_obj, "toploc_verification_fingerprint_validation_results", None
                 )
+                is not None
+            ):
+                try:
+                    # Make sure toploc_verification_fingerprint_validation_results is properly extracted and formatted
+                    if i < len(
+                        recv_obj.toploc_verification_fingerprint_validation_results
+                    ):
+                        validation_result = (
+                            recv_obj.toploc_verification_fingerprint_validation_results[
+                                i
+                            ]
+                        )
+                        meta_info[
+                            "toploc_verification_fingerprint_validation_result"
+                        ] = validation_result
+                except Exception as e:
+                    logger.error(
+                        f"Error processing toploc verification fingerprint validation results: {e}"
+                    )
 
             if isinstance(recv_obj, BatchStrOut):
                 out_dict = {

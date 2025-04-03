@@ -185,7 +185,7 @@ class ServerArgs:
     debug_tensor_dump_input_file: Optional[str] = None
     debug_tensor_dump_inject: bool = False
 
-    toploc_fingerprint: bool = False
+    toploc_verification: bool = False
     toploc_verification_topk: Optional[int] = 128
 
     def __post_init__(self):
@@ -1067,9 +1067,9 @@ class ServerArgs:
         )
 
         parser.add_argument(
-            "--toploc-fingerprint",
+            "--toploc-verification",
             action="store_true",
-            help="Enable activation saving for TopLoc fingerprinting",
+            help="Enable features relating to toploc verification",
         )
         parser.add_argument(
             "--toploc-verification-topk",
@@ -1134,10 +1134,6 @@ def prepare_server_args(argv: List[str]) -> ServerArgs:
     ServerArgs.add_cli_args(parser)
     raw_args = parser.parse_args(argv)
     server_args = ServerArgs.from_cli_args(raw_args)
-    if server_args.toploc_fingerprint:
-        logger.info(
-            f"TopLoc fingerprint verification enabled with topk={server_args.toploc_verification_topk}"
-        )
     return server_args
 
 

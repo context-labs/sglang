@@ -349,7 +349,7 @@ class ChatCompletionRequest(BaseModel):
     stream_reasoning: bool = True
 
     # Extra parameters for SRT backend only and will be ignored by OpenAI models.
-    verification_proof_to_validate: Optional[str] = None
+    toploc_verification_fingerprint_to_validate: Optional[str] = None
     return_input_ids: bool = False
     return_output_ids: bool = False
 
@@ -374,8 +374,8 @@ class ChatMessage(BaseModel):
     content: Optional[str] = None
     reasoning_content: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = Field(default=None, examples=[None])
-    verification_proofs: Optional[List] = None
-    verification_proof_validation_result: Optional[str] = None
+    toploc_verification_fingerprints: Optional[List] = None
+    toploc_verification_fingerprint_validation_result: Optional[str] = None
 
 
 class ChatCompletionResponseChoice(BaseModel):
@@ -402,8 +402,8 @@ class DeltaMessage(BaseModel):
     content: Optional[str] = None
     reasoning_content: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = Field(default=None, examples=[None])
-    verification_proofs: Optional[List] = None
-    verification_proof_validation_result: Optional[str] = None
+    toploc_verification_fingerprints: Optional[List] = None
+    toploc_verification_fingerprint_validation_result: Optional[str] = None
 
 
 class ChatCompletionResponseStreamChoice(BaseModel):

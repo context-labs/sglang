@@ -961,9 +961,6 @@ class ModelRunner:
     def forward(
         self, forward_batch: ForwardBatch, skip_attn_backend_init: bool = False
     ) -> LogitsProcessorOutput:
-        logger.debug(
-            f"vptv in model_runner.forward_batch: {forward_batch.verification_proofs_to_validate}"
-        )
         if (
             forward_batch.forward_mode.is_cuda_graph()
             and self.cuda_graph_runner
