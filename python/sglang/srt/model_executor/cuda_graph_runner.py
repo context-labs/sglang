@@ -188,7 +188,7 @@ class CudaGraphRunner:
         self.capture_forward_mode = ForwardMode.DECODE
 
         # Set capture_hidden_mode based on speculative decoding and toploc fingerprinting
-        if model_runner.server_args.toploc_fingerprint:
+        if model_runner.server_args.toploc_verification:
             # When toploc fingerprinting is enabled, we need at least LAST mode
             self.capture_hidden_mode = CaptureHiddenMode.LAST
         else:
@@ -251,7 +251,7 @@ class CudaGraphRunner:
                 )
 
             # Check if toploc verification is enabled via server args directly
-            if self.model_runner.server_args.toploc_fingerprint:
+            if self.model_runner.server_args.toploc_verification:
                 self.hidden_states = torch.zeros(
                     (self.max_num_token, self.model_runner.model_config.hidden_size),
                     dtype=self.model_runner.dtype,
@@ -416,7 +416,7 @@ class CudaGraphRunner:
 
         if (
             self.capture_hidden_mode == CaptureHiddenMode.NULL
-            and self.model_runner.server_args.toploc_fingerprint
+            and self.model_runner.server_args.toploc_verification
         ):
             logger.debug("Setting capture_hidden_mode to LAST in cuda_graph_runner")
             self.capture_hidden_mode = CaptureHiddenMode.LAST
