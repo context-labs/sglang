@@ -218,7 +218,7 @@ class ForwardBatch:
     capture_hidden_mode: CaptureHiddenMode = None
 
     # Verification algorithm
-    toploc_fingerprint: bool = False
+    toploc_verification: bool = False
 
     # For padding
     padded_static_len: int = -1  # -1 if not padded
