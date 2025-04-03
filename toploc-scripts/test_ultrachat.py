@@ -135,7 +135,7 @@ def start_server(args):
     return server_process, port
 
 
-def process_samples(samples, port, seed, output_json):
+def process_samples(args, samples, port, seed, output_json):
     """
     Process UltraChat samples, generate responses, and verify proofs.
     """
@@ -191,6 +191,9 @@ def process_samples(samples, port, seed, output_json):
             print("Response received:")
             print(json.dumps(response_dump, indent=4))
 
+            if args.interactive:
+                input("Press Enter to continue...")
+
             original_content = response_dump["choices"][0]["message"]["content"]
             last_token_proof = response_dump["choices"][0]["message"][
                 "verification_proofs"
@@ -211,6 +214,12 @@ def process_samples(samples, port, seed, output_json):
             )
 
             prefill_dump = prefill_response.model_dump()
+
+            print("Prefill response received:")
+            print(json.dumps(prefill_dump, indent=4))
+
+            if args.interactive:
+                input("Press Enter to continue...")
 
             # Parse verification result
             validation_result = json.loads(
@@ -282,6 +291,9 @@ def main():
     )
     parser.add_argument("--quiet", action="store_true", help="Run in quiet mode")
     parser.add_argument(
+        "--interactive", action="store_true", help="Run in interactive mode"
+    )
+    parser.add_argument(
         "--output",
         type=str,
         default="ultrachat_verification_results.json",
@@ -313,7 +325,7 @@ def main():
 
     try:
         # Process samples
-        process_samples(samples, port, args.seed, args.output)
+        process_samples(args, samples, port, args.seed, args.output)
     finally:
         # Terminate server
         print("Terminating server...")

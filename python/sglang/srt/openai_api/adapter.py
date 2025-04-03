@@ -1174,6 +1174,7 @@ def v1_chat_generate_response(
         if verification_proofs:
             logger.debug(f"Verification proofs type: {type(verification_proofs)}")
             logger.debug(f"Verification proofs content: {verification_proofs}")
+            verification_proofs = filter(lambda x: x is not None, verification_proofs)
         else:
             verification_proofs = None
 
