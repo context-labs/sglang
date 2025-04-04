@@ -1133,6 +1133,7 @@ def prepare_server_args(argv: List[str]) -> ServerArgs:
     parser = argparse.ArgumentParser()
     ServerArgs.add_cli_args(parser)
     raw_args = parser.parse_args(argv)
+    print(raw_args)
     server_args = ServerArgs.from_cli_args(raw_args)
     return server_args
 

@@ -137,7 +137,6 @@ class Session:
             top_logprobs_num=req.top_logprobs_num,
             token_ids_logprob=req.token_ids_logprob,
             toploc_verification_fingerprint_to_validate=req.toploc_verification_fingerprint_to_validate,
-            # return_hidden_states=req.return_hidden_states, # TODO: this as well?
         )
         if last_req is not None:
             new_req.image_inputs = last_req.image_inputs

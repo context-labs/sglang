@@ -28,7 +28,7 @@ def verify_toploc_fingerprint(
 
         topk = global_server_args_dict.get("toploc_verification_topk", 128)
 
-        results = verify_fingerprints_base64(
+        results = verify_proofs_base64(
             [verification_hidden_state],
             [verification_fingerprint],
             decode_batching_size=1,
@@ -71,7 +71,7 @@ def create_toploc_fingerprint(
 
         topk = global_server_args_dict.get("toploc_verification_topk", 128)
 
-        fingerprint = build_fingerprints_base64(
+        fingerprint = build_proofs_base64(
             [verification_hidden_state],
             decode_batching_size=1,
             topk=topk,

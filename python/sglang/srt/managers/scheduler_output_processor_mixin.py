@@ -123,6 +123,7 @@ class SchedulerOutputProcessorMixin:
                         )
 
                     if logits_output.toploc_verification_hidden_states is not None:
+
                         # each item in toploc_verification_hidden_states can contain a mixture of sequences for prefill
                         # this fetches the last token in the sequence
                         toploc_verification_hidden_state = (
@@ -649,42 +650,42 @@ class SchedulerOutputProcessorMixin:
         if rids:
             if self.model_config.is_multimodal_gen:
                 return
-            # Create the BatchTokenIDOut object and log its contents
-            batch_out = BatchTokenIDOut(
-                rids,
-                finished_reasons,
-                decoded_texts,
-                decode_ids_list,
-                read_offsets,
-                output_ids,
-                skip_special_tokens,
-                spaces_between_special_tokens,
-                no_stop_trim,
-                prompt_tokens,
-                completion_tokens,
-                cached_tokens,
-                spec_verify_ct,
-                input_token_logprobs_val,
-                input_token_logprobs_idx,
-                output_token_logprobs_val,
-                output_token_logprobs_idx,
-                input_top_logprobs_val,
-                input_top_logprobs_idx,
-                output_top_logprobs_val,
-                output_top_logprobs_idx,
-                input_token_ids_logprobs_val,
-                input_token_ids_logprobs_idx,
-                output_token_ids_logprobs_val,
-                output_token_ids_logprobs_idx,
-                origin_input_ids,
-                output_token_ids,
-                output_hidden_states,
-                toploc_verification_fingerprints,
-                toploc_verification_fingerprint_validation_results,
-            )
 
             # Send to detokenizer
-            self.send_to_detokenizer.send_pyobj(batch_out)
+            self.send_to_detokenizer.send_pyobj(
+                BatchTokenIDOut(
+                    rids,
+                    finished_reasons,
+                    decoded_texts,
+                    decode_ids_list,
+                    read_offsets,
+                    output_ids,
+                    skip_special_tokens,
+                    spaces_between_special_tokens,
+                    no_stop_trim,
+                    prompt_tokens,
+                    completion_tokens,
+                    cached_tokens,
+                    spec_verify_ct,
+                    input_token_logprobs_val,
+                    input_token_logprobs_idx,
+                    output_token_logprobs_val,
+                    output_token_logprobs_idx,
+                    input_top_logprobs_val,
+                    input_top_logprobs_idx,
+                    output_top_logprobs_val,
+                    output_top_logprobs_idx,
+                    input_token_ids_logprobs_val,
+                    input_token_ids_logprobs_idx,
+                    output_token_ids_logprobs_val,
+                    output_token_ids_logprobs_idx,
+                    origin_input_ids,
+                    output_token_ids,
+                    output_hidden_states,
+                    toploc_verification_fingerprints,
+                    toploc_verification_fingerprint_validation_results,
+                )
+            )
 
     def stream_output_embedding(self, reqs: List[Req]):
         rids = []

@@ -1343,10 +1343,7 @@ class ScheduleBatch:
         )
 
         # Ensure CAPTURE_HIDDEN_MODE is *at least* LAST if toploc verification is enabled
-        if (
-            global_server_args_dict["toploc_verification"]
-            and capture_hidden_mode == CaptureHiddenMode.NULL
-        ):
+        if self.toploc_verification and capture_hidden_mode == CaptureHiddenMode.NULL:
             capture_hidden_mode = CaptureHiddenMode.LAST
 
         toploc_verification_fingerprints_to_validate = [

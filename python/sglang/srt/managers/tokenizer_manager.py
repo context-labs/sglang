@@ -910,7 +910,6 @@ class TokenizerManager:
                     i < len(recv_obj.origin_input_ids)
                     and recv_obj.origin_input_ids[i] is not None
                 ):
-                    logger.debug(f"Adding origin_input_ids to meta_info for rid {rid}")
                     meta_info["origin_input_ids"] = recv_obj.origin_input_ids[i]
 
             # Add output_token_ids to meta_info if available
@@ -919,7 +918,6 @@ class TokenizerManager:
                     i < len(recv_obj.output_token_ids)
                     and recv_obj.output_token_ids[i] is not None
                 ):
-                    logger.debug(f"Adding output_token_ids to meta_info for rid {rid}")
                     meta_info["output_token_ids"] = recv_obj.output_token_ids[i]
 
             if getattr(state.obj, "return_logprob", False):

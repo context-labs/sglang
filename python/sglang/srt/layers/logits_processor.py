@@ -194,9 +194,6 @@ class LogitsMetadata:
         self.dp_local_num_tokens = dp_local_num_tokens
         self.gathered_buffer = gathered_buffer
 
-    def is_toploc_enabled(self) -> bool:
-        return global_server_args_dict.get("toploc_verification", False)
-
 
 class LogitsProcessor(nn.Module):
     def __init__(
@@ -356,7 +353,7 @@ class LogitsProcessor(nn.Module):
 
         # If toploc is enabled, capture pruned hidden states
         toploc_verification_hidden_states_to_store: Optional[torch.Tensor] = None
-        if logits_metadata.is_toploc_enabled():
+        if logits_metadata.toploc_verification:
             toploc_verification_hidden_states_to_store = (
                 pruned_states[sample_indices] if sample_indices else pruned_states
             )
