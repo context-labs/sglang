@@ -186,14 +186,7 @@ class CudaGraphRunner:
         # Batch sizes to capture
         self.capture_bs, self.compile_bs = get_batch_sizes_to_capture(model_runner)
         self.capture_forward_mode = ForwardMode.DECODE
-
-        # Set capture_hidden_mode based on speculative decoding and toploc fingerprinting
-        if model_runner.server_args.toploc_verification:
-            # When toploc fingerprinting is enabled, we need at least LAST mode
-            self.capture_hidden_mode = CaptureHiddenMode.LAST
-        else:
-            self.capture_hidden_mode = CaptureHiddenMode.NULL
-
+        self.capture_hidden_mode = CaptureHiddenMode.NULL
         self.num_tokens_per_bs = 1
         if model_runner.spec_algorithm.is_eagle():
             if self.model_runner.is_draft_worker:
@@ -249,9 +242,8 @@ class CudaGraphRunner:
                     (self.max_num_token, self.model_runner.model_config.hidden_size),
                     dtype=self.model_runner.dtype,
                 )
-
-            # Check if toploc verification is enabled via server args directly
-            if self.model_runner.server_args.toploc_verification:
+            # TopLOC verification
+            elif self.model_runner.server_args.toploc_verification:
                 self.hidden_states = torch.zeros(
                     (self.max_num_token, self.model_runner.model_config.hidden_size),
                     dtype=self.model_runner.dtype,
@@ -333,9 +325,6 @@ class CudaGraphRunner:
         return is_bs_supported and is_encoder_lens_supported
 
     def capture(self):
-        logger.debug(
-            f"Capturing graph in cuda_graph_runner with hidden capture code: {self.capture_hidden_mode}"
-        )
         with graph_capture() as graph_capture_context:
             self.stream = graph_capture_context.stream
             avail_mem = get_available_gpu_memory(
@@ -414,11 +403,11 @@ class CudaGraphRunner:
                 spec_info.capture_hidden_mode if spec_info else CaptureHiddenMode.NULL
             )
 
+        # During CUDA graph capture, ensure capture_hidden_mode is *at least* LAST if toploc verification is enabled
         if (
             self.capture_hidden_mode == CaptureHiddenMode.NULL
             and self.model_runner.server_args.toploc_verification
         ):
-            logger.debug("Setting capture_hidden_mode to LAST in cuda_graph_runner")
             self.capture_hidden_mode = CaptureHiddenMode.LAST
 
         forward_batch = ForwardBatch(
@@ -476,23 +465,29 @@ class CudaGraphRunner:
         return graph, out
 
     def recapture_if_needed(self, forward_batch: ForwardBatch):
-        logger.debug("Recapturing graph in cuda_graph_runner")
 
         # If the capture_hidden_mode changes, we need to recapture the graph
         hidden_mode_from_spec_info = getattr(
             forward_batch.spec_info, "capture_hidden_mode", CaptureHiddenMode.NULL
         )
-        if (
-            forward_batch.capture_hidden_mode == CaptureHiddenMode.FULL
-            and self.capture_hidden_mode != CaptureHiddenMode.FULL
-        ):
-            self.capture_hidden_mode = CaptureHiddenMode.FULL
-            self.capture()
-        elif (
-            forward_batch.capture_hidden_mode != CaptureHiddenMode.FULL
-            and self.capture_hidden_mode != hidden_mode_from_spec_info
-        ):
-            self.capture_hidden_mode = hidden_mode_from_spec_info
+        capture_hidden_mode_priority = {
+            CaptureHiddenMode.NULL: 1,
+            CaptureHiddenMode.LAST: 2,
+            CaptureHiddenMode.FULL: 3,
+        }
+        max_priority_level = max(
+            capture_hidden_mode_priority[mode]
+            for mode in [forward_batch.capture_hidden_mode, hidden_mode_from_spec_info]
+        )
+        capture_hidden_mode_by_priority = {
+            v: k for k, v in capture_hidden_mode_priority.items()
+        }
+        highest_needed_capture_mode = capture_hidden_mode_by_priority[
+            max_priority_level
+        ]
+
+        if self.capture_hidden_mode != highest_needed_capture_mode:
+            self.capture_hidden_mode = highest_needed_capture_mode
             self.capture()
 
     def replay_prepare(self, forward_batch: ForwardBatch):
