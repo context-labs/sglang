@@ -41,7 +41,15 @@ def verify_toploc_fingerprint(
                 "No verification results returned from verify_fingerprints_base64"
             )
 
-        return json.dumps(dataclasses.asdict(results[0]))
+        validation_result = results[0]
+
+        return json.dumps(
+            {
+                "exp_mismatches": validation_result.exp_mismatches,
+                "mant_err_mean": validation_result.mant_err_mean,
+                "mant_err_median": validation_result.mant_err_median,
+            }
+        )
     except Exception as e:
         error_msg = f"Error verifying TopLoc fingerprint: {str(e)}"
         logger.error(error_msg)
