@@ -3,155 +3,35 @@
 **Goal**: Automatically detect and flag "spoofed inferences".
 
 **Business Value**: Prevents fraud and ensures the quality of the service.
+This becomes even more important if we want to embrace a fully decentralized model for inference.
 
 **Constraints**: Low error rate, minimal speed impact.
 
+We are trying to answer one simple question: **"Did you use the model you say you did to generate this response?"**
 
-**Sam**: Since you want to get your hands dirty, here's a quick guide on how to work do the verification flow "by hand".
+This weeds out a variety of kinds of spoofing, like:
+- Running a different quantization
+- Running a different model
 
-First, you need to checkout this branch from our fork of sglang, and create a virtual environment at the root of the repository.
 
-Activate the environment and install sglang:
+## Technical Approach - Overview
 
-```
-pip install -e "python[all]" --find-links https://flashinfer.ai/whl/cu124/torch2.5/flashinfer-python
-pip install transformers==4.48.3
-pip install datasets
-```
+This is a fork of SGLang.
 
-You also need to set your `HF_TOKEN` environment variable to a token which has access to `meta-llama/3.1-8b-instruct`.  You can find mine in 1Password under Engineering.
+It extends SGLang by adding two new capabilities:
+- The ability to include a "top loc fingerprint" with every inference response
+- The ability to validate that a fingerprint matches a model's internal state
 
-```
-export HF_TOKEN=...
-```
+Here is how those capabilities are used to make verification work:
 
-For starters, try running this script:
-
-```
-python toploc-scripts/minimal_example.py --disable-cuda-graph
-```
-
-**Note**: CUDA graph introduces some kind of non-determinism in the prefill that makes verification occassionally fail (maybe 1 out of 6 times).  This is a new behavior compared to my testing from last week, so I'm hoping it's because I upgraded toploc to v0.1.4, and this is easily resolved.  I'll come back to this shortly.
-
-If you really want to do the flow by hand, here's a step by step guide:
-
-Here is the command you can run to start the server:
-```
-python -m sglang.launch_server --model-path meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --port 3001 --toploc-verification --toploc-verification-topk 128 --log-level debug --disable-cuda-graph
-```
-
-Now, you can send an inference request to the server, and you can see the fingerprint in the response:
-```
-import json
-import openai
-
-params = {
-    "temperature": 0,
-    "seed": 42,
-}
-
-client = openai.Client(base_url=f"http://127.0.0.1:3001/v1", api_key="None")
-
-prompt = "What is the capital of Bulgaria?"
-response = client.chat.completions.create(
-    model="meta-llama/Llama-3.1-8B-Instruct",
-    messages=[
-        {"role": "user", "content": prompt},
-    ],
-    **params
-)
-response_dump = response.model_dump()
-print("Response received:")
-print(json.dumps(response_dump, indent=4))
-```
-
-The response will contain a `toploc_verification_fingerprints` array:
-```json
-{
-    "choices": [
-        {
-            "message": {
-                "content": "Sofia",
-                "toploc_verification_fingerprints": ["...", "..."]
-            }
-        }
-    ]
-}
-```
-
-There are typically two.  We're only interested in the last one.
-
-Now, we need to validate the fingerprint.  How do we do that?  By sending it to a verification instance along with the original prompt and response.
-
-Step by step:
-
-1. Append to the messages array, so that it includes both the original message and the response:
-```json
-{
-    "role": "user",
-    "content": "What is the capital of Bulgaria?"
-},
-// This is the response ---v to this ----^
-{
-    "role": "assistant",
-    "content": (the response)
-}
-```
-
-2. Set `max_tokens` to 0. This is what makes it a prefill.
-
-3. Set `toploc_verification_fingerprint_to_validate` to the last fingerprint in the `toploc_verification_fingerprints` array.
-
-The verification instance will respond with a `toploc_verification_fingerprint_validation_result`, which will look something like this (but serialized as a string):
-
-```json
-{
-    "exp_mismatches": 1,
-    "mant_err_mean": 0.75,
-    "mant_err_median": 0.75,
-}
-```
-
-These error statistics are what is interpreted to determine if this is a verification pass or verification failure.
-
-If it seems like there's too many steps, please keep in mind that we *have* to:
-1. Send a request
-2. Collect the response's fingerprint
-3. *Exactly* replicate the original prompt + response with a prefill request
-4. Collect the validation result
-
-The implementation of this fork would have been much simpler if we had worked with the SGLang module directly in Python (i.e.; `import sglang`), but that's not how our workers work.  Our workers runby running in a sidecar with an HTTP interface.  So that's why I engineered pass-thrus into the API layer.
-
-**Important Note On Prefill Replication**
-
-I am replicating the original prompt + response by appending an assistant message to the messages array to represent the response.
-
-This will work in most cases, possibly all cases.
-
-However, I'm anticipating that you can't completely replicate the prompt + response prefill if you have tools in your request, because tools aren't contained in the messages array.  It might be possible to get it to work, but I anticipate it to be buggy and error-prone.
-
-Another concern is fragility.  Suppose that SGLang changes the way it parses or generates responses, the model  updates its chat template, etc etc.  Then, the same messages array will not correspond to the same token ID inputs.
-
-For both of these reasons, I've implemented two other features to make pre-fill more robust:
-1. `return_input_ids` - returns the token IDs of the prompt if included in the request
-2. `return_output_ids` - returns the token IDs of the response if included in the request
-
-Then, pre-fill request will simply take:
-`input_ids[:-1] + output_ids + EOT`, which is a far more reliable way to replicate prompt + response.
+1. An instance running this fork of SGLang will compute a "top loc fingerprint" of the internal activations of the model and include it with the inference response.
+2. When we want to verify a response, we will send the prompt, the response, and the fingerprint to a verification instance running the same model as the operator claims they used.
+3. The verification instance will run a prefill with the prompt + response.  This replicates the state of the model as of when the last token was generated with the original inference.
+4. The verification instance compares the internal states of the model with the fingerprint it was asked to validate.
+5. The verification instance includes how closely the fingerprint matched the internal state of the model in its response.
 
 
 
-
-
-**Approach**:
-
-1. During inference, compute a "fingerprint" of the internal activations of the model.
-2. Include the fingerprint in the inference response.
-3. Later, the system sends the prompt, response, and fingerprint to a "verification instance".
-4. The verification instance concatenates the prompt and response, and "prefills" the model with this text.
-5. If the fingerprint matches the activations of the verification model (within tolerances), the response is valid.
-
-**Answers one simple question**: **"Did you use the model you say you did to generate this response?"**
 
 ### Also...
 I'll cover a reputation update system that only slashes operators when it's "reasonably sure" they're a spoofer (taking into account the False Negative Rate).
@@ -426,9 +306,8 @@ Theoretically, a spoofer could:
 2. Run a prefill on their fake response and collect the genuine fingerprint of the fake response: `fingerprint("What are the benefits of cross-training?" + "blah blah blah")`
 3. Return this fingerprint and their fake response, and not generate any new tokens.
 
-This would require some insight and sophistication from the spoofer.
+I'm aware that this is a griefing vector.  It's a weakness present with the original TopLOC paper, that I'm not sure even the authors of the original paper considered it.
 
-However, we can do some basic things that make this more difficult to do with our own code:
-1. Prevent our fork of sglang from returning a fingerprint when prefilling - only return fingerprint in step-by-step decode mode.
+I've been thinking about this and how this might be patched up.  Nothing has occurred to me yet, but I think there may be some kind of solution involving cryptographic committments (something including an extra sha256 hash that proves that sampling actually occurred - i'm not quite sure yet).
 
-A better fix is to collect logprobs of the "generated" tokens, and perform a statistical test to compute a probability that the response is authentic.  This probability can be fed into the update rule for spoofer probability.  If an operator continues to generate unlikely sequences, their spoofer probability will increase, and they will be blocked.
+We can do some basic things to not make it easy.  And the attacker would basically need to understand the TopLOC paper to even think of doing this.
