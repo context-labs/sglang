@@ -270,3 +270,5 @@ I'm aware that this is a griefing vector.  It's a weakness present with the orig
 I've been thinking about this and how this might be patched up.  Nothing has occurred to me yet, but I think there may be some kind of solution involving cryptographic committments (something including an extra sha256 hash that proves that sampling actually occurred - i'm not quite sure yet).
 
 We can do some basic things to not make it easy.  And the attacker would basically need to understand the TopLOC paper to even think of doing this.
+
+I'm not super worried because it's a clever workaround and wouldn't be discovered immediately, but I also wouldn't publicize our approach until we've had a chance to patch this up.
