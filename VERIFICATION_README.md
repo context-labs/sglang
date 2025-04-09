@@ -108,6 +108,9 @@ graph
 The system should have a near-zero (if not zero) False Negative Rate and a low False Positive Rate.
 
 ### Reputation
+
+**Please Note**: *After experimenting with implementating the operator reputation described in this section, the "update formula" ended up being more complicated than I anticipated.  Even if you do it mathematically correctly, it has weird edge cases.  I've pivoted away from the Bayesian approach and went with a much simpler hypothesis testing approach, and so far that's been working out better.*
+
 We will introduce a "Spoofer Probability" that assigns each operator a 1% chance of being a "spoofer".
 
 | Operator ID | Spoofer Probability |
