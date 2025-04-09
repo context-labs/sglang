@@ -17,7 +17,7 @@ This weeds out a variety of kinds of spoofing, like:
 
 "In the lab" and "in production" are two different things.  So for me, it's less about TopLOC specifically, and more about getting something out there with instrumentation.
 
-However, I *do believe* TopLOC represents a good starting point.  TopLOC is the only practical approach I've seen that addresses the problem of validating internal model states.  And I understand it well enough that if it breaks down in some way, we can probably fix it.
+However, I feel that TopLOC represents a great starting point.  TopLOC is the only practical approach I've seen that addresses the problem of validating internal model states.  It works well in my testing.  And I understand it well enough that if it breaks down in some way, we can probably fix it or adjust it, or try something similar.
 
 So, my main goal is to fail fast and then iterate - rather than advocate for a specific paper, algorithm, etc.  The sooner we can get an MVP system up and running, and the easier we can pivot, the happier I am.
 
@@ -148,8 +148,6 @@ Where $r$ is the False Positive Rate of the verification system (we will have di
 This makes sense because the more times a response is marked as a spoof, the more likely it is that the operator is a spoofer.
 
 This update formula is a form of Bayes' Theorem, which is a fair way of updating probabilities based on new evidence.
-
-**TODO**: *note to self - the update rule isn't exactly correct*
 
 ### Optimization 1: Stochastic Verification
 
