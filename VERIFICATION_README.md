@@ -13,6 +13,15 @@ This weeds out a variety of kinds of spoofing, like:
 - Running a different quantization
 - Running a different model
 
+## My Mindset
+
+"In the lab" and "in production" are two different things.  So for me, it's less about TopLOC specifically, and more about getting something out there with instrumentation.
+
+However, I *do believe* TopLOC represents a good starting point.  TopLOC is the only practical approach I've seen that addresses the problem of validating internal model states.  And I understand it well enough that if it breaks down in some way, we can probably fix it.
+
+So, my main goal is to fail fast and then iterate - rather than advocate for a specific paper, algorithm, etc.  The sooner we can get an MVP system up and running, and the easier we can pivot, the happier I am.
+
+Also, I think that SGLang was probably the hardest of the engines to fork.  I'm guessing that VLLM and ollama will be easier.
 
 ## Technical Approach - Overview
 
