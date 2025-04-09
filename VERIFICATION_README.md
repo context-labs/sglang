@@ -38,19 +38,12 @@ I'll cover a reputation update system that only slashes operators when it's "rea
 
 ### Fingerprinting
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'background': '#ffffff' }}}%%
 graph TD
     P[Prompt] -->|Input| A[Inference Model]
     A -->|Compute Fingerprint| B[Fingerprint]
     A -->|Generate| C[Response]
     B --> D[Inference Response *with* Fingerprint]
     C --> D
-
-    style P fill:#d5f5e3,stroke:#333,stroke-width:2px
-    style A fill:#f9d5e5,stroke:#333,stroke-width:2px
-    style B fill:#eeeeee,stroke:#333,stroke-width:1px
-    style C fill:#d5e8f9,stroke:#333,stroke-width:1px
-    style D fill:#c7e8ca,stroke:#333,stroke-width:2px
 ```
 
 ### Example Fingerprint:
@@ -100,7 +93,6 @@ Because we set `max_tokens=0`, the model will perform a "prefill-only", which is
 Internally, it will compare the `toploc_verification_fingerprint_to_validate` with its own activations of the last hidden layer of the model after the prefill.
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'background': '#ffffff' }}}%%
 graph
     DB[(Database)] -->|"Retrieve prompt,<br>response, fingerprint"| V[Verification Instance]
     V -->|"Prefill with<br>prompt + response"| H[Hidden Activations]
@@ -109,13 +101,7 @@ graph
     C -->|Yes| Valid[Valid]
     C -->|No| Invalid[Spoofed]
 
-    style DB fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style V fill:#f9d5e5,stroke:#333,stroke-width:2px
-    style H fill:#ffe6cc,stroke:#333,stroke-width:2px
-    style F fill:#eeeeee,stroke:#333,stroke-width:1px
-    style C fill:#ffe6cc,stroke:#333,stroke-width:2px
-    style Valid fill:#c7e8ca,stroke:#333,stroke-width:2px
-    style Invalid fill:#f8cecc,stroke:#333,stroke-width:2px
+
 ```
 
 ### Reliability
@@ -166,19 +152,17 @@ Therefore:
 2. If the spoofer probability of an operator is 50%, 50% of their requests go to verification.
 3. If the spoofer probability of an operator is 1%, 1% of their requests go to verification.
 
-This creates a feedback loop that quickly removes spoofers from the system.
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'background': '#ffffff' }}}%%
 graph TD
     A[More Requests Sent to Verification] --> B[More Spoofs Detected]
     B --> C[Spoofer Probability Increases]
     C --> A
 
-    style A fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style B fill:#f8cecc,stroke:#333,stroke-width:2px
-    style C fill:#ffe6cc,stroke:#333,stroke-width:2px
+
 ```
+
+This creates a feedback cycle that quickly identifies and pushes spoofers out of the system.
 
 When the Spoofer Probability exceeds some threshold (e.g. 99.99%), we can block the operator and/or apply punitive measures like slashing.
 
@@ -191,7 +175,6 @@ Models like DeepSeek-V3 use a MOE architecture (Mixture of Experts).  At runtime
 The intermediate results of the experts are combined in a final layer before being sent to the final LM-head.
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'background': '#ffffff' }}}%%
 graph TD
     P[Prompt] --> A[MOE Model]
     A --> Router[Expert Router]
@@ -235,29 +218,6 @@ graph TD
     F8 --> FP
     R --> FP
 
-    style P fill:#d5f5e3,stroke:#333,stroke-width:2px
-    style A fill:#f9d5e5,stroke:#333,stroke-width:2px
-    style Router fill:#ffe6cc,stroke:#333,stroke-width:2px
-    style E1 fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style E2 fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style E3 fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style E4 fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style E5 fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style E6 fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style E7 fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style E8 fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style F1 fill:#eeeeee,stroke:#333,stroke-width:1px
-    style F2 fill:#eeeeee,stroke:#333,stroke-width:1px
-    style F3 fill:#eeeeee,stroke:#333,stroke-width:1px
-    style F4 fill:#eeeeee,stroke:#333,stroke-width:1px
-    style F5 fill:#eeeeee,stroke:#333,stroke-width:1px
-    style F6 fill:#eeeeee,stroke:#333,stroke-width:1px
-    style F7 fill:#eeeeee,stroke:#333,stroke-width:1px
-    style F8 fill:#eeeeee,stroke:#333,stroke-width:1px
-    style C fill:#d5e8f9,stroke:#333,stroke-width:2px
-    style L fill:#d5e8f9,stroke:#333,stroke-width:2px
-    style R fill:#d5e8f9,stroke:#333,stroke-width:1px
-    style FP fill:#c7e8ca,stroke:#333,stroke-width:2px
 ```
 
 Instead of fingerprinting the final hidden activations of the model, we can fingerprint the last hidden activations of the 8 selected experts.
@@ -265,7 +225,6 @@ Instead of fingerprinting the final hidden activations of the model, we can fing
 Then, for verification, we can randomly select one of the 8 experts and run a prefill with just that expert.
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'background': '#ffffff' }}}%%
 graph TD
     DB[(Database)] -->|"Retrieve prompt,<br>response, 8 fingerprints"| V[Verification Process]
     V -->|"Randomly select<br>1 out of 8 fingerprints"| F3[Fingerprint 3]
@@ -277,16 +236,6 @@ graph TD
     H --> C
     C -->|Yes| Valid[Valid]
     C -->|No| Invalid[Spoofed]
-
-    style DB fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style V fill:#f9d5e5,stroke:#333,stroke-width:2px
-    style F3 fill:#eeeeee,stroke:#333,stroke-width:1px
-    style P fill:#d5f5e3,stroke:#333,stroke-width:2px
-    style E3 fill:#d0e0e3,stroke:#333,stroke-width:2px
-    style H fill:#ffe6cc,stroke:#333,stroke-width:2px
-    style C fill:#ffe6cc,stroke:#333,stroke-width:2px
-    style Valid fill:#c7e8ca,stroke:#333,stroke-width:2px
-    style Invalid fill:#f8cecc,stroke:#333,stroke-width:2px
 ```
 
 This reduces the memory required for prefilling from x8 A100s to x1.
