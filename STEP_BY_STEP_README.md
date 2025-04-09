@@ -161,12 +161,18 @@ I could have re-implemented it all from scratch because I understand the math, b
 
 ## What Makes The Fork Tricky
 
-There are some really ugly parts of SGLang.
+SGLang takes requests and puts them into a general purpose task scheduler.
 
-There is a task scheduler as well as a batch processor, and multiple kinds of parallelism (tensor and batch).
+Then, SGLang attempts to take tasks of the same kind and group them into batches.
 
-Things get splices together into arrays, and then later separated back out again, more than once.
+The batches store information in arrays, and in some cases the batch objects store nested data structures as flat arrays and then use array indices to set the boundaries between contiguous regions that represent individual items in the batch.  There are also a few different kinds of objects that are at the batch level (`ScheduleBatch`, `BatchTokenIDOut`, `LogitProcessorOutput`, etc.)
 
-My tactic here was to mimic exactly what EAGLE does, since EAGLE uses essentially the same information as verification does.
+So, there is quite a bit of "glue" required to correctly assemble the various kinds of batches and then slice them back apart into requests once inference is complete.
 
-So, if you see something that looks "hacky", just poke around in the code and you'll find that it's doing the same thing as EAGLE does.
+Then, there's additional layers of pass-thru to the API layer of SGLang.
+
+However, there was plenty of precedent for how to do this kind of stuff by looking at the EAGLE code.
+
+So, you'll see a lot of code that is basically the same as EAGLE code that lives right next to it, if you explore up or down a few lines.  This is especially the case when it comes to handling `CaptureHiddenMode` and dealing with `hidden_states`.
+
+This is also a divergent codepath for CUDA Graph Runner that needs to be properly handled.
