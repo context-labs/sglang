@@ -18,7 +18,7 @@ for MODEL in "${MODELS[@]}"; do
     SANITIZED_MODEL=$(echo "$MODEL" | tr '/' '_' | tr ' ' '_')
 
     echo "Processing model: $MODEL"
-    python toploc-scripts/collect_fingerprints.py --N 1000 --machine "$MACHINE" --model "$MODEL" --output_filename "train0_${MACHINE}_${SANITIZED_MODEL}.fingerprint" --disable-cuda-graph
+    python toploc-scripts/collect_fingerprints.py --N 100 --machine "$MACHINE" --model "$MODEL" --output_filename "train0_${MACHINE}_${SANITIZED_MODEL}.fingerprint" --disable-cuda-graph
 
     # Optional: add a small delay between runs
     sleep 2
