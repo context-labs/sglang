@@ -11,14 +11,14 @@ source .venv/bin/activate
 MACHINE=$1
 
 # Array of models to process
-MODELS=("meta-llama/Llama-3.1-8B-Instruct" "meta-llama/Llama-3.1-70B-Instruct" "mistralai/Mistral-7B-Instruct-v0.2")
+MODELS=("meta-llama/Llama-3.1-8B-Instruct" "meta-llama/Llama-3.2-3B-Instruct")
 
 for MODEL in "${MODELS[@]}"; do
     # Sanitize model name for filename
     SANITIZED_MODEL=$(echo "$MODEL" | tr '/' '_' | tr ' ' '_')
 
     echo "Processing model: $MODEL"
-    python collect_fingerprints.py --N 100 --model "$MODEL" --output_filename "train0_${MACHINE}_${SANITIZED_MODEL}.fingerprint"
+    python toploc-scripts/collect_fingerprints.py --N 1000 --machine "$MACHINE" --model "$MODEL" --output_filename "train0_${MACHINE}_${SANITIZED_MODEL}.fingerprint" --disable-cuda-graph
 
     # Optional: add a small delay between runs
     sleep 2

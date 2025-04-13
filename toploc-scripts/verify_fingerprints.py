@@ -28,6 +28,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--machine", type=str, required=True, help="Machine name")
     parser.add_argument(
         "--model",
         type=str,
@@ -38,9 +39,15 @@ def parse_args():
         "--input-file",
         type=str,
         required=True,
-        help="JSON file containing fingerprints to analyze",
+        help="JSON filename containing fingerprints to analyze (from the fingerprints directory)",
     )
-    parser.add_argument("--output-file", type=str, default=None, help="Output filename")
+    parser.add_argument(
+        "--output-file",
+        type=str,
+        required=False,
+        default=None,
+        help="Filename to write the results (goes to verifications directory)",
+    )
     parser.add_argument("--quiet", action="store_true", help="Run in quiet mode")
     parser.add_argument(
         "--disable-cuda-graph", action="store_true", help="Disable CUDA graph"
@@ -77,6 +84,8 @@ def start_server(args):
         MAYBE_DISABLE_CUDA_GRAPH = "--disable-cuda-graph"
     else:
         MAYBE_DISABLE_CUDA_GRAPH = ""
+
+    print(f"Starting server with model {args.model}...")
 
     server_process, port = launch_server_cmd(
         f"""
@@ -115,7 +124,7 @@ def load_fingerprints(args):
     return fingerprints
 
 
-def verify_fingerprints(port, fingerprints):
+def verify_fingerprints(args, port, fingerprints):
     """
     Verify the fingerprints by making verification requests to the server.
     """
@@ -150,6 +159,12 @@ def verify_fingerprints(port, fingerprints):
                 "prompt": prompt,
                 "verification_request": request,
                 "verification_response": response_dump,
+                "original_request": item["complete_request"],
+                "original_response": item["complete_response"],
+                "original_machine": item["machine"],
+                "original_model": item["model"],
+                "verification_machine": args.machine,
+                "verification_model": args.model,
                 "original_fingerprint": fingerprint,
                 "verification_result": response_dump["choices"][0]["message"].get(
                     "toploc_verification_fingerprint_validation_result", False
@@ -159,15 +174,6 @@ def verify_fingerprints(port, fingerprints):
             verification_results.append(verification_result)
         except Exception as e:
             print(f"Error verifying fingerprint {i}: {e}")
-            verification_results.append(
-                {
-                    "prompt": prompt,
-                    "verification_request": request,
-                    "error": str(e),
-                    "original_fingerprint": fingerprint,
-                    "is_verified": False,
-                }
-            )
 
     return verification_results
 
@@ -193,7 +199,7 @@ def main():
     server_process, port = start_server(args)
 
     try:
-        verification_results = verify_fingerprints(port, fingerprints)
+        verification_results = verify_fingerprints(args, port, fingerprints)
         write_to_file(args, verification_results)
 
         # Print a summary of verification results

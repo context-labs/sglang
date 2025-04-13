@@ -1,2 +1,5 @@
 .env
 ultrachat/**.*
+fingerprints/**.*
+verifications/**.*
+replications/**.*

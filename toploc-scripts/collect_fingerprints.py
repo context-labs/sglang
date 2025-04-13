@@ -28,6 +28,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def parse_args():
     parser = ArgumentParser()
+    parser.add_argument("--machine", type=str, required=True, help="Machine name")
     parser.add_argument(
         "--model",
         type=str,
@@ -89,9 +90,11 @@ def start_server(args):
     else:
         MAYBE_DISABLE_CUDA_GRAPH = ""
 
+    print(f"Starting server with model {args.model}...")
+
     server_process, port = launch_server_cmd(
         f"""
-        python -m sglang.launch_server --model-path meta-llama/Llama-3.1-8B-Instruct --host 0.0.0.0 --toploc-verification {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
+        python -m sglang.launch_server --model-path {args.model} --host 0.0.0.0 --toploc-verification {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
         """
     )
 
@@ -138,6 +141,7 @@ def collect_N_fingerprints(port, args):
 
             fingerprints.append(
                 {
+                    "machine": args.machine,
                     "prompt": prompt,
                     "complete_request": request,
                     "complete_response": response_dump,
@@ -151,7 +155,8 @@ def collect_N_fingerprints(port, args):
 
 def write_to_file(args, fingerprints):
     if args.output_filename is None:
-        args.output_filename = args.model.replace("/", "_") + "_for_" + args.input_file
+        ultrachat_no_ext = os.path.splitext(args.ultrachat_file)[0]
+        args.output_filename = args.model.replace("/", "_") + "_for_" + ultrachat_no_ext
     output_filepath = os.path.join(SCRIPT_DIR, "fingerprints", args.output_filename)
     with open(output_filepath, "w") as f:
         json.dump(fingerprints, f, indent=4)
