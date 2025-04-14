@@ -150,7 +150,7 @@ def perform_replications(inferences, machine_name, args):
 
         # Start server with the model from the first inference if not already running
         if port is None:
-            model_to_use = model_from_inference
+            model_to_use = args.override_model or model_from_inference
             print(f"Starting server with model {model_to_use}...")
             kill_gpu_processes()
             server_process, port = start_server(args, model_to_use)
@@ -252,6 +252,7 @@ def main():
     inferences = load_inferences(args)
     print(f"Loaded {len(inferences)} inferences, preparing to replicate...")
 
+    server_process = None
     try:
         # Server will be started within perform_replications when processing the first inference
         replication_results, server_process = perform_replications(
