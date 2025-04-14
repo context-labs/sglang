@@ -30,10 +30,17 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--machine", type=str, required=True, help="Machine name")
     parser.add_argument(
+        "--override-model",
+        type=str,
+        required=False,
+        default=None,
+        help="Override model to use when replicating",
+    )
+    parser.add_argument(
         "--input-file",
         type=str,
         required=True,
-        help="JSON filename containing fingerprints to analyze (from the fingerprints directory)",
+        help="JSON filename containing inferences to replicate (from the inferences_to_replicate directory)",
     )
     parser.add_argument(
         "--output-file",
@@ -50,8 +57,15 @@ def parse_args():
         "--limit",
         type=int,
         default=None,
-        help="Limit number of fingerprints to analyze",
+        help="Limit number of inferences to replicate (whole file if not supplied)",
     )
+    parser.add_argument(
+        "--N",
+        type=int,
+        default=None,
+        help="Number of inferences to replicate (whole file if not supplied)",
+    )
+    parser.add_argument("--skip-write", action="store_true")
     return parser.parse_args()
 
 
@@ -96,44 +110,47 @@ def start_server(args, model_path):
     return server_process, port
 
 
-def load_fingerprints(args):
+def load_inferences(args):
     """
-    Load fingerprints from the input file.
+    Load inferences from the input file.
     """
     input_filepath = args.input_file
     if not os.path.isabs(input_filepath):
-        input_filepath = os.path.join(SCRIPT_DIR, "fingerprints", input_filepath)
+        input_filepath = os.path.join(
+            SCRIPT_DIR, "inferences_to_replicate", input_filepath
+        )
 
-    print(f"Loading fingerprints from {input_filepath}")
+    print(f"Loading inferences from {input_filepath}")
     with open(input_filepath, "r") as f:
-        fingerprints = json.load(f)
+        inferences = json.load(f)
 
     if args.limit is not None and args.limit > 0:
-        fingerprints = fingerprints[: args.limit]
-        print(f"Limited to first {args.limit} fingerprints")
+        inferences = inferences[: args.limit]
+        print(f"Limited to first {args.limit} inferences")
 
-    return fingerprints
+    return inferences
 
 
-def perform_replications(fingerprints, machine_name, args):
+def perform_replications(inferences, machine_name, args):
     """
-    Rerun the prompts from the fingerprints and collect new responses.
+    Rerun the prompts from the inferences and collect new responses.
     """
     replication_results = []
     server_process = None
     port = None
     client = None
 
-    for i, item in enumerate(tqdm(fingerprints)):
+    for i, item in enumerate(tqdm(inferences)):
+        if args.N is not None and i >= args.N:
+            break
         prompt = item["prompt"]
-        model_from_fingerprint = item.get("model")
+        model_from_inference = item.get("model")
         original_request = item["complete_request"]
         original_response = item["complete_response"]
-        original_fingerprint = item["fingerprint"]
 
-        # Start server with the model from the first fingerprint if not already running
+        # Start server with the model from the first inference if not already running
         if port is None:
-            model_to_use = model_from_fingerprint
+            model_to_use = model_from_inference
             print(f"Starting server with model {model_to_use}...")
             kill_gpu_processes()
             server_process, port = start_server(args, model_to_use)
@@ -143,16 +160,6 @@ def perform_replications(fingerprints, machine_name, args):
 
         # Copy all parameters from the original request
         request = dict(original_request)
-
-        # Ensure we're using chat completion format
-        if "messages" not in request:
-            request["messages"] = [{"role": "user", "content": prompt}]
-
-        # Make sure we're not verifying fingerprints in this run
-        if "extra_body" in request:
-            extra_body = request["extra_body"]
-            if "toploc_verification_fingerprint_to_validate" in extra_body:
-                del extra_body["toploc_verification_fingerprint_to_validate"]
 
         try:
             response = client.chat.completions.create(**request)
@@ -165,12 +172,38 @@ def perform_replications(fingerprints, machine_name, args):
                 "prompt": prompt,
                 "original_request": original_request,
                 "original_response": original_response,
-                "original_fingerprint": original_fingerprint,
                 "replication_request": request,
                 "replication_response": response_dump,
             }
 
             replication_results.append(replication_result)
+
+            original_response_text = original_response["choices"][0]["message"][
+                "content"
+            ]
+            replication_response_text = response_dump["choices"][0]["message"][
+                "content"
+            ]
+
+            if original_response_text != replication_response_text:
+                prefix_match_len = (
+                    calculate_prefix_match_length(
+                        original_response_text, replication_response_text
+                    )
+                    or 0
+                )
+                prefix_match_percent = (
+                    prefix_match_len / len(original_response_text) * 100
+                )
+                print(
+                    f"   >>> Prompt {i} did not match original response (prefix %: {prefix_match_percent:.2f}, response lengths: {len(original_response_text)} : {len(replication_response_text)})"
+                )
+                print(
+                    f"Divergence:\n\t{original_response_text[prefix_match_len:prefix_match_len+10]}\n\t{replication_response_text[prefix_match_len:prefix_match_len+10]}"
+                )
+            else:
+                print(f"   >>> Prompt {i} matched original response")
+
         except Exception as e:
             print(f"Error replicating prompt {i}: {e}")
             replication_results.append(
@@ -183,6 +216,10 @@ def perform_replications(fingerprints, machine_name, args):
                     "original_fingerprint": original_fingerprint,
                     "replication_request": request,
                     "error": str(e),
+                    "prefix_match_length": prefix_match_len,
+                    "prefix_match_percent": prefix_match_percent,
+                    "original_response_length": len(original_response_text),
+                    "replication_response_length": len(replication_response_text),
                 }
             )
 
@@ -194,10 +231,6 @@ def write_to_file(args, replication_results):
     """
     Write replication results to the output file.
     """
-    # Create replications directory if it doesn't exist
-    replications_dir = os.path.join(SCRIPT_DIR, "replications")
-    os.makedirs(replications_dir, exist_ok=True)
-
     if args.output_file is None:
         first_result = replication_results[0]
         model = first_result["replication_request"]["model"]
@@ -206,6 +239,8 @@ def write_to_file(args, replication_results):
             model_prefix + "_replications_for_" + os.path.basename(args.input_file)
         )
 
+    replications_dir = os.path.join(SCRIPT_DIR, "replications")
+    os.makedirs(replications_dir, exist_ok=True)
     output_filepath = os.path.join(replications_dir, args.output_file)
     with open(output_filepath, "w") as f:
         json.dump(replication_results, f, indent=4)
@@ -214,29 +249,38 @@ def write_to_file(args, replication_results):
 
 def main():
     args = parse_args()
-    fingerprints = load_fingerprints(args)
-    print(f"Loaded {len(fingerprints)} fingerprints, preparing to replicate...")
+    inferences = load_inferences(args)
+    print(f"Loaded {len(inferences)} inferences, preparing to replicate...")
 
     try:
-        # Server will be started within perform_replications when processing the first fingerprint
+        # Server will be started within perform_replications when processing the first inference
         replication_results, server_process = perform_replications(
-            fingerprints, args.machine, args
+            inferences, args.machine, args
         )
-        write_to_file(args, replication_results)
+
+        if not args.skip_write:
+            write_to_file(args, replication_results)
 
         # Print a summary of replication results
         print(f"\nReplication summary:")
         print(f"Total replications: {len(replication_results)}")
-        success_count = sum(
+        no_error_count = sum(
             1 for result in replication_results if "error" not in result
         )
-        print(f"Successful replications: {success_count}")
-        print(f"Failed replications: {len(replication_results) - success_count}")
+        print(f"Replications with no errors: {no_error_count}")
+        print(f"Replications with errors: {len(replication_results) - no_error_count}")
     finally:
         if server_process:
             print("Terminating server...")
             terminate_process(server_process)
             print("Server terminated.")
+
+
+def calculate_prefix_match_length(original, replication):
+    length = max(len(original), len(replication))
+    original = original + " " * (length - len(original))
+    replication = replication + " " * (length - len(replication))
+    return sum(1 for o, r in zip(original, replication) if o == r)
 
 
 if __name__ == "__main__":

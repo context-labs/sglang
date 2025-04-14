@@ -184,7 +184,9 @@ def write_to_file(args, verification_results):
     """
     if args.output_file is None:
         args.output_file = args.model.replace("/", "_") + "_for_" + args.input_file
-    output_filepath = os.path.join(SCRIPT_DIR, "verifications", args.output_file)
+    verifications_dir = os.path.join(SCRIPT_DIR, "verifications")
+    output_filepath = os.path.join(verifications_dir, args.output_file)
+    os.makedirs(verifications_dir, exist_ok=True)
     with open(output_filepath, "w") as f:
         json.dump(verification_results, f, indent=4)
     print(f"Verification results written to {output_filepath}")

@@ -1,5 +1,6 @@
 .env
-ultrachat/**.*
-fingerprints/**.*
-verifications/**.*
-replications/**.*
+ultrachat/**/**.*
+fingerprints/**/**.*
+verifications/**/**.*
+replications/**/**.*
+replications/**/**.*
