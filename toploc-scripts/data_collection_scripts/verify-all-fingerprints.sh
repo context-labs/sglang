@@ -17,7 +17,7 @@ if [ ! -d "toploc-scripts/fingerprints" ]; then
 fi
 
 # Array of models to process
-MODELS=("meta-llama/Llama-3.1-8B-Instruct" "meta-llama/Llama-3.2-3B-Instruct")
+MODELS=("meta-llama/Llama-3.1-8B-Instruct" "meta-llama/Llama-3.1-8B-Instruct;fp8" "meta-llama/Llama-3.2-3B-Instruct")
 
 # Loop over all .fingerprint files
 for fingerprint_filepath in toploc-scripts/fingerprints/*.fingerprint; do

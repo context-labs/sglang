@@ -24,6 +24,7 @@ if not os.getenv("HF_TOKEN"):
     sys.exit(1)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR)
 
 
 def parse_args():
@@ -87,9 +88,19 @@ def start_server(args):
 
     print(f"Starting server with model {args.model}...")
 
+    print(f"Starting server with model {args.model}...")
+
+    model, *quantization = args.model.split(";")
+    if quantization:
+        quantization = quantization[0]
+        print(f"Quantization: {quantization}")
+        MAYBE_QUANTIZATION = f"--quantization {quantization}"
+    else:
+        MAYBE_QUANTIZATION = ""
+
     server_process, port = launch_server_cmd(
         f"""
-        python -m sglang.launch_server --model-path {args.model} --host 0.0.0.0 --toploc-verification {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
+        python -m sglang.launch_server --model-path {model} {MAYBE_QUANTIZATION} --host 0.0.0.0 --toploc-verification {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
         """
     )
 
@@ -111,7 +122,7 @@ def load_fingerprints(args):
     """
     input_filepath = args.input_file
     if not os.path.isabs(input_filepath):
-        input_filepath = os.path.join(SCRIPT_DIR, "fingerprints", input_filepath)
+        input_filepath = os.path.join(ROOT_DIR, "fingerprints", input_filepath)
 
     print(f"Loading fingerprints from {input_filepath}")
     with open(input_filepath, "r") as f:
@@ -184,7 +195,7 @@ def write_to_file(args, verification_results):
     """
     if args.output_file is None:
         args.output_file = args.model.replace("/", "_") + "_for_" + args.input_file
-    verifications_dir = os.path.join(SCRIPT_DIR, "verifications")
+    verifications_dir = os.path.join(ROOT_DIR, "verifications")
     output_filepath = os.path.join(verifications_dir, args.output_file)
     os.makedirs(verifications_dir, exist_ok=True)
     with open(output_filepath, "w") as f:

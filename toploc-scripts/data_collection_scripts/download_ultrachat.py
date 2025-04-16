@@ -23,8 +23,8 @@ def download_ultrachat(repo_id="stingning/ultrachat", target_dir=None):
         repo_id (str): The Hugging Face repository ID
         target_dir (str, optional): Target directory to download files to. Defaults to current directory.
     """
-    script_dir = Path(__file__).parent.absolute()
-    target_dir = script_dir / target_dir
+    root_dir = Path(__file__).parent.parent.absolute()
+    target_dir = root_dir / target_dir
     os.makedirs(target_dir, exist_ok=True)
 
     print(f"Downloading UltraChat dataset from {repo_id}...")

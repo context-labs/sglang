@@ -24,6 +24,7 @@ if not os.getenv("HF_TOKEN"):
     sys.exit(1)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR)
 
 
 def parse_args():
@@ -32,7 +33,7 @@ def parse_args():
     parser.add_argument(
         "--model",
         type=str,
-        default="meta-llama/Llama-3.1-8B-Instruct",
+        required=True,
         help="Model to use",
     )
     parser.add_argument(
@@ -76,10 +77,10 @@ def kill_gpu_processes():
 
 def start_server(args):
     """
-    Start the SGL server with TopLoc fingerprint verification enabled.
+    Start the SGL server with TopLoc server.
     """
 
-    print("Starting server with TopLoc fingerprint verification enabled...")
+    print("Starting server with TopLoc server...")
     if args.quiet:
         MAYBE_NOISY = ""
     else:
@@ -92,9 +93,17 @@ def start_server(args):
 
     print(f"Starting server with model {args.model}...")
 
+    model, *quantization = args.model.split(";")
+    if quantization:
+        quantization = quantization[0]
+        print(f"Quantization: {quantization}")
+        MAYBE_QUANTIZATION = f"--quantization {quantization}"
+    else:
+        MAYBE_QUANTIZATION = ""
+
     server_process, port = launch_server_cmd(
         f"""
-        python -m sglang.launch_server --model-path {args.model} --host 0.0.0.0 --toploc-verification {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
+        python -m sglang.launch_server --model-path {model} {MAYBE_QUANTIZATION} --host 0.0.0.0 {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
         """
     )
 
@@ -110,10 +119,10 @@ def start_server(args):
     return server_process, port
 
 
-def collect_N_fingerprints(port, args):
+def collect_N_inferences(port, args):
     client = openai.Client(base_url=f"http://127.0.0.1:{port}/v1", api_key="None")
-    fingerprints = []
-    ultrachat_filepath = os.path.join(SCRIPT_DIR, "ultrachat", args.ultrachat_file)
+    inferences = []
+    ultrachat_filepath = os.path.join(ROOT_DIR, "ultrachat", args.ultrachat_file)
 
     with open(ultrachat_filepath, "r") as f:
         for i, line in enumerate(tqdm(f)):
@@ -130,45 +139,40 @@ def collect_N_fingerprints(port, args):
                 ],
                 temperature=args.temperature,
                 seed=args.seed,
-                extra_body={"return_verification_proofs": True},
             )
 
             response = client.chat.completions.create(**request)
             response_dump = response.model_dump()
-            fingerprint = response_dump["choices"][0]["message"][
-                "toploc_verification_fingerprints"
-            ][-1]
 
-            fingerprints.append(
+            inferences.append(
                 {
                     "machine": args.machine,
                     "prompt": prompt,
                     "complete_request": request,
                     "complete_response": response_dump,
                     "model": args.model,
-                    "fingerprint": fingerprint,
                 }
             )
 
-    return fingerprints
+    return inferences
 
 
-def write_to_file(args, fingerprints):
+def write_to_file(args, inferences):
     if args.output_filename is None:
         ultrachat_no_ext = os.path.splitext(args.ultrachat_file)[0]
         args.output_filename = args.model.replace("/", "_") + "_for_" + ultrachat_no_ext
-    fingerprints_dir = os.path.join(SCRIPT_DIR, "fingerprints")
-    os.makedirs(fingerprints_dir, exist_ok=True)
-    output_filepath = os.path.join(fingerprints_dir, args.output_filename)
+    inferences_dir = os.path.join(ROOT_DIR, "inferences_to_replicate")
+    os.makedirs(inferences_dir, exist_ok=True)
+    output_filepath = os.path.join(inferences_dir, args.output_filename)
     with open(output_filepath, "w") as f:
-        json.dump(fingerprints, f, indent=4)
+        json.dump(inferences, f, indent=4)
 
 
 if __name__ == "__main__":
     args = parse_args()
     kill_gpu_processes()
     server_process, port = start_server(args)
-    fingerprints = collect_N_fingerprints(port, args)
-    write_to_file(args, fingerprints)
+    inferences = collect_N_inferences(port, args)
+    write_to_file(args, inferences)
     server_process.terminate()
     print("Server terminated.")

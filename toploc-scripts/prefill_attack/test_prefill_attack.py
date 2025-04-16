@@ -18,6 +18,7 @@ from sglang.utils import (
 )
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR)
 
 ERROR_THRESHOLDS = {
     "exp_mismatches": 90,  # Maximum number of exponent mismatches allowed
@@ -45,9 +46,19 @@ def start_server(args):
 
     print(f"Starting server with model {args.model}...")
 
+    print(f"Starting server with model {args.model}...")
+
+    model, *quantization = args.model.split(";")
+    if quantization:
+        quantization = quantization[0]
+        print(f"Quantization: {quantization}")
+        MAYBE_QUANTIZATION = f"--quantization {quantization}"
+    else:
+        MAYBE_QUANTIZATION = ""
+
     server_process, port = launch_server_cmd(
         f"""
-        python -m sglang.launch_server --model-path {args.model} --host 0.0.0.0 --toploc-verification {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
+        python -m sglang.launch_server --model-path {model} {MAYBE_QUANTIZATION} --host 0.0.0.0 --toploc-verification {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
         """
     )
 
@@ -75,7 +86,7 @@ def kill_gpu_processes():
 def test_prefills(args, port):
     client = openai.Client(base_url=f"http://127.0.0.1:{port}/v1", api_key="None")
 
-    ultrachat_file = os.path.join(SCRIPT_DIR, "ultrachat", args.ultrachat_file)
+    ultrachat_file = os.path.join(ROOT_DIR, "ultrachat", args.ultrachat_file)
 
     # read ultrachat file in a loop
     with open(ultrachat_file, "r") as f:

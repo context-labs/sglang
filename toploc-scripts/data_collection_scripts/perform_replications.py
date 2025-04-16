@@ -24,6 +24,7 @@ if not os.getenv("HF_TOKEN"):
     sys.exit(1)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR)
 
 
 def parse_args():
@@ -92,9 +93,19 @@ def start_server(args, model_path):
     else:
         MAYBE_DISABLE_CUDA_GRAPH = ""
 
+    print(f"Starting server with model {args.model}...")
+
+    model, *quantization = args.model.split(";")
+    if quantization:
+        quantization = quantization[0]
+        print(f"Quantization: {quantization}")
+        MAYBE_QUANTIZATION = f"--quantization {quantization}"
+    else:
+        MAYBE_QUANTIZATION = ""
+
     server_process, port = launch_server_cmd(
         f"""
-        python -m sglang.launch_server --model-path {model_path} --host 0.0.0.0 {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
+        python -m sglang.launch_server --model-path {model} {MAYBE_QUANTIZATION} --host 0.0.0.0 {MAYBE_NOISY} {MAYBE_DISABLE_CUDA_GRAPH}
         """
     )
 
@@ -117,7 +128,7 @@ def load_inferences(args):
     input_filepath = args.input_file
     if not os.path.isabs(input_filepath):
         input_filepath = os.path.join(
-            SCRIPT_DIR, "inferences_to_replicate", input_filepath
+            ROOT_DIR, "inferences_to_replicate", input_filepath
         )
 
     print(f"Loading inferences from {input_filepath}")
@@ -160,6 +171,7 @@ def perform_replications(inferences, machine_name, args):
 
         # Copy all parameters from the original request
         request = dict(original_request)
+        request["model"] = args.override_model or model_from_inference
 
         try:
             response = client.chat.completions.create(**request)
@@ -239,7 +251,7 @@ def write_to_file(args, replication_results):
             model_prefix + "_replications_for_" + os.path.basename(args.input_file)
         )
 
-    replications_dir = os.path.join(SCRIPT_DIR, "replications")
+    replications_dir = os.path.join(ROOT_DIR, "replications")
     os.makedirs(replications_dir, exist_ok=True)
     output_filepath = os.path.join(replications_dir, args.output_file)
     with open(output_filepath, "w") as f:

@@ -93,7 +93,8 @@ def compute_replication_matrix():
     """Compute the replication success matrix."""
     # Get all replication files
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    replication_dir = os.path.join(script_dir, "replications")
+    root_dir = os.path.dirname(script_dir)
+    replication_dir = os.path.join(root_dir, "replications")
     replication_files = glob.glob(os.path.join(replication_dir, "*"))
 
     if not replication_files:

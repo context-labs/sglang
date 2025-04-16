@@ -13,8 +13,15 @@ pip install tabulate
 
 MACHINE=$1
 
+if [ -z "$MACHINE" ]; then
+    echo "Error: Machine name is empty"
+    exit 1
+fi
+
+
 # Array of models to process
-MODELS=("meta-llama/Llama-3.1-8B-Instruct" "meta-llama/Llama-3.2-3B-Instruct")
+# "meta-llama/Llama-3.1-8B-Instruct;fp8"
+MODELS=("meta-llama/Llama-3.1-8B-Instruct" "context-labs/neuralmagic-llama-3.1-8b-instruct-FP8" "meta-llama/Llama-3.2-3B-Instruct")
 
 if [ ! -d "toploc-scripts/inferences_to_replicate" ]; then
     mkdir -p toploc-scripts/inferences_to_replicate
@@ -30,7 +37,7 @@ for MODEL in "${MODELS[@]}"; do
         echo "Output file already exists: ${OUTPUT_FILENAME}"
         continue
     fi
-    python toploc-scripts/collect_inferences_to_replicate.py --N 10 --machine "$MACHINE" --model "$MODEL" --output_filename "${OUTPUT_FILENAME}" --disable-cuda-graph
+    python toploc-scripts/data_collection_scripts/collect_inferences_to_replicate.py --N 100 --machine "$MACHINE" --model "$MODEL" --output_filename "${OUTPUT_FILENAME}" --disable-cuda-graph
 
     # Optional: add a small delay between runs
     sleep 2

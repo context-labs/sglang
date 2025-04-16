@@ -98,7 +98,8 @@ def compute_verification_matrix():
     """Compute the verification success matrix."""
     # Get all verification files
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    verification_dir = os.path.join(script_dir, "verifications")
+    root_dir = os.path.dirname(script_dir)
+    verification_dir = os.path.join(root_dir, "verifications")
     verification_files = glob.glob(os.path.join(verification_dir, "*.verification"))
 
     if not verification_files:

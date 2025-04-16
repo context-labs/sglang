@@ -19,7 +19,7 @@ if [ ! -d "toploc-scripts/inferences_to_replicate" ]; then
     exit 1
 fi
 
-MODELS=("meta-llama/Llama-3.1-8B-Instruct" "meta-llama/Llama-3.2-3B-Instruct")
+MODELS=("meta-llama/Llama-3.1-8B-Instruct" "meta-llama/Llama-3.1-8B-Instruct;fp8" "meta-llama/Llama-3.2-3B-Instruct")
 
 # Loop over all .inference files
 for inference_filepath in toploc-scripts/inferences_to_replicate/*.inference; do
@@ -35,7 +35,7 @@ for inference_filepath in toploc-scripts/inferences_to_replicate/*.inference; do
                 continue
             fi
             echo "Output file: $output_file"
-            python toploc-scripts/perform_replications.py --override-model $REPLICATION_MODEL --input-file "$inference_file" --machine "$MACHINE" --output-file "$output_file" --disable-cuda-graph --quiet --N 1
+            python toploc-scripts/perform_replications.py --override-model $REPLICATION_MODEL --input-file "$inference_file" --machine "$MACHINE" --output-file "$output_file" --disable-cuda-graph --quiet
 
             # Optional: Add a small delay between replications
             sleep 1
