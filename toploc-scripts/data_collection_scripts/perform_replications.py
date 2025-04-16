@@ -67,6 +67,7 @@ def parse_args():
         help="Number of inferences to replicate (whole file if not supplied)",
     )
     parser.add_argument("--skip-write", action="store_true")
+    parser.add_argument("--interactive", action="store_true")
     return parser.parse_args()
 
 
@@ -93,9 +94,9 @@ def start_server(args, model_path):
     else:
         MAYBE_DISABLE_CUDA_GRAPH = ""
 
-    print(f"Starting server with model {args.model}...")
+    print(f"Starting server with model {model_path}...")
 
-    model, *quantization = args.model.split(";")
+    model, *quantization = model_path.split(";")
     if quantization:
         quantization = quantization[0]
         print(f"Quantization: {quantization}")
@@ -118,6 +119,12 @@ def start_server(args, model_path):
     print("Waiting 3 more seconds for server to be fully initialized...")
     time.sleep(3)
 
+    print(
+        f"Started server with model {model} on port {port} {MAYBE_QUANTIZATION}, {MAYBE_NOISY}, {MAYBE_DISABLE_CUDA_GRAPH}"
+    )
+    if args.interactive:
+        input("Press Enter when ready to continue...")
+
     return server_process, port
 
 
@@ -138,6 +145,10 @@ def load_inferences(args):
     if args.limit is not None and args.limit > 0:
         inferences = inferences[: args.limit]
         print(f"Limited to first {args.limit} inferences")
+
+    print(f"Loaded {len(inferences)} inferences from {input_filepath}")
+    if args.interactive:
+        input("Press Enter when ready to continue...")
 
     return inferences
 
@@ -172,6 +183,8 @@ def perform_replications(inferences, machine_name, args):
         # Copy all parameters from the original request
         request = dict(original_request)
         request["model"] = args.override_model or model_from_inference
+        request["logprobs"] = True
+        request["top_logprobs"] = 1
 
         try:
             response = client.chat.completions.create(**request)

@@ -26,8 +26,6 @@ OUTPUT_DIR = os.path.abspath(
     os.path.join(TOPLOC_DIR, "classifier_analysis_results", "embeddings_v1")
 )
 
-model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -35,7 +33,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def compute_scores(args, filename, df):
+def compute_scores(args, sim_callback, filename, df):
     filepath = os.path.join(TOPLOC_DIR, "replications", filename)
     with open(filepath, "r") as f:
         data = json.load(f)
@@ -47,15 +45,11 @@ def compute_scores(args, filename, df):
         repl_model = item["replication_request"]["model"]
 
         orig_response = item["original_response"]["choices"][0]["message"]["content"]
-        orig_embedding = get_np_embedding(orig_response)  # -> [M, D]
 
         repl_response = item["replication_response"]["choices"][0]["message"]["content"]
-        repl_embedding = get_np_embedding(repl_response)  # -> [M, D]
 
-        similarity = cosine_similarity(
-            orig_embedding.mean(axis=0).reshape(1, -1),
-            repl_embedding.mean(axis=0).reshape(1, -1),
-        )
+        similarity = sim_callback(orig_response, repl_response)
+
         df.append(
             {
                 "prompt": item["prompt"],
@@ -73,6 +67,37 @@ def compute_scores(args, filename, df):
 def get_np_embedding(text: str):
     embeddings = model.encode([text])
     return embeddings
+
+
+def cosine_similarity_callback(model):
+    def callback(orig_response, repl_response):
+        orig_embedding = get_np_embedding(orig_response)  # -> [M, D]
+        repl_embedding = get_np_embedding(repl_response)  # -> [M, D]
+
+        similarity = cosine_similarity(
+            orig_embedding.mean(axis=0).reshape(1, -1),
+            repl_embedding.mean(axis=0).reshape(1, -1),
+        )
+        return similarity
+
+    return callback
+
+
+def cross_encoder_similarity_callback(model):
+    def callback(orig_response, repl_response):
+        similarity = model.predict([orig_response, repl_response])
+        return similarity[0]
+
+    return callback
+
+
+def make_sim_callback(args):
+    if args.sim_method == "cosine/all-MiniLM-L6-v2":
+        model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        return cosine_similarity_callback(model)
+    elif args.sim_method == "cross-encoder/stsb-distilroberta-base":
+        model = CrossEncoder("cross-encoder/stsb-distilroberta-base")
+        return cross_encoder_similarity_callback(model)
 
 
 def analyze_results(name, df, score_column):
