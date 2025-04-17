@@ -183,8 +183,8 @@ def perform_replications(inferences, machine_name, args):
         # Copy all parameters from the original request
         request = dict(original_request)
         request["model"] = args.override_model or model_from_inference
-        request["logprobs"] = True
-        request["top_logprobs"] = 1
+        # request["logprobs"] = True
+        # request["top_logprobs"] = 1
 
         try:
             response = client.chat.completions.create(**request)
