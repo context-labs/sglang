@@ -16,7 +16,7 @@
 import time
 from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing_extensions import Literal
 
 
@@ -301,6 +301,8 @@ class ToolChoice(BaseModel):
 class ChatCompletionRequest(BaseModel):
     # Ordered by official OpenAI API documentation
     # https://platform.openai.com/docs/api-reference/chat/create
+    model_config = ConfigDict(extra='allow')
+
     messages: List[ChatCompletionMessageParam]
     model: str
     frequency_penalty: float = 0.0

@@ -868,6 +868,7 @@ def v1_chat_generate_request(
     top_logprobs_nums = []
     modalities_list = []
     lora_paths = []
+    return_hidden_states = []
 
     # NOTE: with openai API, the prompt's logprobs are always not computed
 
@@ -961,10 +962,11 @@ def v1_chat_generate_request(
             modalities = []
         input_ids.append(prompt_ids)
         return_logprobs.append(request.logprobs)
-        logprob_start_lens.append(-1)
         top_logprobs_nums.append(request.top_logprobs or 0)
         lora_paths.append(request.lora_path)
-
+        logprob_start_lens.append(request.__pydantic_extra__.get("logprob_start_len", -1))
+        return_hidden_states.append(request.__pydantic_extra__.get("return_hidden_states", False))
+        
         sampling_params = {
             "temperature": request.temperature,
             "max_new_tokens": request.max_tokens,
@@ -1029,7 +1031,9 @@ def v1_chat_generate_request(
         rid=request_ids,
         modalities=modalities_list,
         lora_path=lora_paths,
+        return_hidden_states=return_hidden_states
     )
+
 
     return adapted_request, all_requests if len(all_requests) > 1 else all_requests[0]
 
@@ -1046,6 +1050,7 @@ def v1_chat_generate_response(
 
     for idx, ret_item in enumerate(ret):
         logprobs = False
+
         if isinstance(request, list) and request[idx].logprobs:
             logprobs = True
         elif (not isinstance(request, list)) and request.logprobs:
@@ -1226,6 +1231,7 @@ def v1_chat_generate_response(
 
 async def v1_chat_completions(tokenizer_manager, raw_request: Request):
     request_json = await raw_request.json()
+
     all_requests = [ChatCompletionRequest(**request_json)]
     adapted_request, request = v1_chat_generate_request(all_requests, tokenizer_manager)
 

@@ -291,6 +291,7 @@ class SchedulerOutputProcessorMixin:
                 Some of input logprob operation should only happen at the last
                 prefill (e.g., computing input token logprobs).
         """
+
         assert output.input_token_logprobs is not None
         if req.input_token_logprobs is None:
             req.input_token_logprobs = []
