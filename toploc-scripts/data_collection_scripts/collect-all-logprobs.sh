@@ -34,7 +34,7 @@ for inference_filepath in toploc-scripts/inferences_to_replicate/*.inference; do
 
         echo "Processing model: $MODEL"
 
-        python toploc-scripts/data_collection_scripts/collect_logprobs.py --N 100 --machine "$MACHINE" --model "$MODEL" --input-file "$filename" --output-file "$OUTPUT_FILENAME" --disable-cuda-graph
+        python toploc-scripts/data_collection_scripts/collect_logprobs.py --N 1 --interactive --machine "$MACHINE" --model "$MODEL" --input-file "$filename" --output-file "$OUTPUT_FILENAME" --disable-cuda-graph
 
         exit 0
 

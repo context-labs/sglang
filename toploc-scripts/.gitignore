@@ -9,3 +9,4 @@ inferences_to_replicate/**/**.*
 *.html
 classifier_analysis_results/
 response_logprobs/
+**/**.ipynb
