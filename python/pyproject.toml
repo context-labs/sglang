@@ -39,6 +39,7 @@ runtime_common = [
     "uvicorn",
     "uvloop",
     "xgrammar==0.1.16",
+    "toploc==0.1.4"
 ]
 
 srt = [

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 from sglang.srt.layers.logits_processor import LogitsProcessorOutput
 from sglang.srt.managers.io_struct import BatchEmbeddingOut, BatchTokenIDOut
 from sglang.srt.managers.schedule_batch import BaseFinishReason, Req, ScheduleBatch
+from sglang.srt.verification.toploc_verification_utils import (
+    create_toploc_fingerprint,
+    verify_toploc_fingerprint,
+)
 
 if TYPE_CHECKING:
     from sglang.srt.managers.scheduler import (
@@ -12,6 +17,8 @@ if TYPE_CHECKING:
         GenerationBatchResult,
         ScheduleBatch,
     )
+
+logger = logging.getLogger(__name__)
 
 
 class SchedulerOutputProcessorMixin:
@@ -58,6 +65,7 @@ class SchedulerOutputProcessorMixin:
                         )
 
             hidden_state_offset = 0
+            toploc_verification_hidden_state_offset = 0
 
             # Check finish conditions
             logprob_pt = 0
@@ -114,9 +122,31 @@ class SchedulerOutputProcessorMixin:
                             .tolist()
                         )
 
-                    if req.grammar is not None:
-                        req.grammar.accept_token(next_token_id)
-                        req.grammar.finished = req.finished()
+                    if logits_output.toploc_verification_hidden_states is not None:
+
+                        # each item in toploc_verification_hidden_states can contain a mixture of sequences for prefill
+                        # this fetches the last token in the sequence
+                        toploc_verification_hidden_state = (
+                            logits_output.toploc_verification_hidden_states[i]
+                            .cpu()
+                            .clone()
+                        )
+                        toploc_verification_hidden_state_offset += len(
+                            req.origin_input_ids
+                        )
+                        req.toploc_verification_hidden_states.append(
+                            toploc_verification_hidden_state
+                        )
+                        req.toploc_verification_fingerprints.append(
+                            create_toploc_fingerprint(toploc_verification_hidden_state)
+                        )
+                        if req.toploc_verification_fingerprint_to_validate is not None:
+                            req.toploc_verification_fingerprint_validation_result = (
+                                verify_toploc_fingerprint(
+                                    toploc_verification_hidden_state,
+                                    req.toploc_verification_fingerprint_to_validate,
+                                )
+                            )
                 else:
                     # being chunked reqs' prefill is not finished
                     req.is_chunked -= 1
@@ -249,6 +279,30 @@ class SchedulerOutputProcessorMixin:
                 req.hidden_states.append(
                     logits_output.hidden_states[i].cpu().clone().tolist()
                 )
+
+            if logits_output.toploc_verification_hidden_states is not None:
+                # each item in toploc_verification_hidden_states is [N,D] when N is number of tokens
+                if req.finished():
+                    toploc_verification_hidden_state = (
+                        logits_output.toploc_verification_hidden_states[i].cpu().clone()
+                    )
+                    req.toploc_verification_hidden_states.append(
+                        toploc_verification_hidden_state
+                    )
+                    req.toploc_verification_fingerprints.append(
+                        create_toploc_fingerprint(toploc_verification_hidden_state)
+                    )
+                    if req.toploc_verification_fingerprint_to_validate is not None:
+                        req.toploc_verification_fingerprint_validation_result = (
+                            verify_toploc_fingerprint(
+                                toploc_verification_hidden_state[-1, ...],  # last token
+                                req.toploc_verification_fingerprint_to_validate,
+                            )
+                        )
+                else:
+                    # No need to generate a fingerprint until the last decode step of the sequence
+                    req.toploc_verification_hidden_states.append(None)
+                    req.toploc_verification_fingerprints.append(None)
 
             if req.grammar is not None and batch.spec_algorithm.is_none():
                 req.grammar.accept_token(next_token_id)
@@ -463,6 +517,10 @@ class SchedulerOutputProcessorMixin:
         cached_tokens = []
         spec_verify_ct = []
         output_hidden_states = None
+        toploc_verification_fingerprints = None
+        toploc_verification_fingerprint_validation_results = None
+        origin_input_ids = []
+        output_token_ids = []
 
         if return_logprob:
             input_token_logprobs_val = []
@@ -558,10 +616,42 @@ class SchedulerOutputProcessorMixin:
                         output_hidden_states = []
                     output_hidden_states.append(req.hidden_states)
 
+                if toploc_verification_fingerprints is None:
+                    toploc_verification_fingerprints = []
+                if (
+                    hasattr(req, "toploc_verification_fingerprints")
+                    and req.toploc_verification_fingerprints is not None
+                ):
+                    toploc_verification_fingerprints.append(
+                        req.toploc_verification_fingerprints
+                    )
+
+                # Collect TopLOC verification fingerprint validation results
+                if toploc_verification_fingerprint_validation_results is None:
+                    toploc_verification_fingerprint_validation_results = []
+                toploc_verification_fingerprint_validation_results.append(
+                    req.toploc_verification_fingerprint_validation_result
+                )
+
+                if (
+                    hasattr(req, "origin_input_ids")
+                    and req.origin_input_ids is not None
+                ):
+                    origin_input_ids.append(list(req.origin_input_ids))
+                else:
+                    origin_input_ids.append([])
+
+                if hasattr(req, "output_ids") and req.output_ids is not None:
+                    output_token_ids.append(list(req.output_ids))
+                else:
+                    output_token_ids.append([])
+
         # Send to detokenizer
         if rids:
             if self.model_config.is_multimodal_gen:
                 return
+
+            # Send to detokenizer
             self.send_to_detokenizer.send_pyobj(
                 BatchTokenIDOut(
                     rids,
@@ -589,7 +679,11 @@ class SchedulerOutputProcessorMixin:
                     input_token_ids_logprobs_idx,
                     output_token_ids_logprobs_val,
                     output_token_ids_logprobs_idx,
+                    origin_input_ids,
+                    output_token_ids,
                     output_hidden_states,
+                    toploc_verification_fingerprints,
+                    toploc_verification_fingerprint_validation_results,
                 )
             )
 

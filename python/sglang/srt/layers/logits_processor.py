@@ -54,6 +54,9 @@ class LogitsProcessorOutput:
     # The last hidden layers
     hidden_states: Optional[torch.Tensor] = None
 
+    # Captured hidden states for the purposes of generating and validating TopLOC "fingerprints", aka "fingerprints"
+    toploc_verification_hidden_states: Optional[torch.Tensor] = None
+
     ## Part 2: This part will be assigned in python/sglang/srt/layers/sampler.py::Sampler
     # The logprobs of the next tokens.                              shape: [#seq]
     next_token_logprobs: Optional[torch.Tensor] = None
@@ -79,7 +82,7 @@ class LogitsProcessorOutput:
 class LogitsMetadata:
     forward_mode: ForwardMode
     capture_hidden_mode: CaptureHiddenMode = CaptureHiddenMode.NULL
-
+    toploc_verification: bool = False
     extend_return_logprob: bool = False
     extend_return_top_logprob: bool = False
     extend_token_ids_logprob: bool = False
@@ -143,6 +146,7 @@ class LogitsMetadata:
         return cls(
             forward_mode=forward_batch.forward_mode,
             capture_hidden_mode=forward_batch.capture_hidden_mode,
+            toploc_verification=forward_batch.toploc_verification,
             extend_return_logprob=extend_return_logprob,
             extend_return_top_logprob=extend_return_top_logprob,
             extend_token_ids_logprob=extend_token_ids_logprob,
@@ -347,11 +351,20 @@ class LogitsProcessor(nn.Module):
             else:
                 assert False, "Should never reach"
 
+        # If toploc is enabled, capture pruned hidden states
+        toploc_verification_hidden_states_to_store: Optional[torch.Tensor] = None
+        if logits_metadata.toploc_verification:
+            toploc_verification_hidden_states_to_store = (
+                pruned_states[sample_indices] if sample_indices else pruned_states
+            )
+
         if not logits_metadata.extend_return_logprob:
             # Decode mode or extend mode without return_logprob.
+
             return LogitsProcessorOutput(
                 next_token_logits=sampled_logits,
                 hidden_states=hidden_states_to_store,
+                toploc_verification_hidden_states=toploc_verification_hidden_states_to_store,
             )
         else:
             input_logprobs = logits[input_logprob_indices]
@@ -405,6 +418,7 @@ class LogitsProcessor(nn.Module):
                 input_top_logprobs_val=input_top_logprobs_val,
                 input_top_logprobs_idx=input_top_logprobs_idx,
                 hidden_states=hidden_states_to_store,
+                toploc_verification_hidden_states=toploc_verification_hidden_states_to_store,
                 input_token_ids_logprobs_val=input_token_ids_logprobs_val,
                 input_token_ids_logprobs_idx=input_token_ids_logprobs_idx,
             )

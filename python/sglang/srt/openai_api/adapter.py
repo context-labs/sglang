@@ -704,7 +704,7 @@ def v1_generate_response(request, ret, tokenizer_manager, to_file=False):
                 total_tokens=prompt_tokens + completion_tokens,
             ),
         )
-    return response
+        return response
 
 
 async def v1_completions(tokenizer_manager, raw_request: Request):
@@ -876,6 +876,7 @@ def v1_chat_generate_request(
     top_logprobs_nums = []
     modalities_list = []
     lora_paths = []
+    toploc_verification_fingerprints_to_validate = []
 
     # NOTE: with openai API, the prompt's logprobs are always not computed
 
@@ -972,6 +973,9 @@ def v1_chat_generate_request(
         logprob_start_lens.append(-1)
         top_logprobs_nums.append(request.top_logprobs or 0)
         lora_paths.append(request.lora_path)
+        toploc_verification_fingerprints_to_validate.append(
+            request.toploc_verification_fingerprint_to_validate
+        )
 
         sampling_params = {
             "temperature": request.temperature,
@@ -1019,6 +1023,9 @@ def v1_chat_generate_request(
         top_logprobs_nums = top_logprobs_nums[0]
         modalities_list = modalities_list[0]
         lora_paths = lora_paths[0]
+        toploc_verification_fingerprints_to_validate = (
+            toploc_verification_fingerprints_to_validate[0]
+        )
     else:
         if isinstance(input_ids[0], str):
             prompt_kwargs = {"text": input_ids}
@@ -1037,6 +1044,7 @@ def v1_chat_generate_request(
         rid=request_ids,
         modalities=modalities_list,
         lora_path=lora_paths,
+        toploc_verification_fingerprint_to_validate=toploc_verification_fingerprints_to_validate,
     )
 
     return adapted_request, all_requests if len(all_requests) > 1 else all_requests[0]
@@ -1147,6 +1155,30 @@ def v1_chat_generate_response(
                         "Failed to parse fc related info to json format!",
                     )
 
+        toploc_verification_fingerprints = ret_item["meta_info"].get(
+            "toploc_verification_fingerprints", None
+        )
+        if toploc_verification_fingerprints:
+            toploc_verification_fingerprints = (
+                [toploc_verification_fingerprints]
+                if not isinstance(toploc_verification_fingerprints, list)
+                else toploc_verification_fingerprints
+            )
+
+        # Extract verification fingerprints if available
+        if toploc_verification_fingerprints:
+            toploc_verification_fingerprints = filter(
+                lambda x: x is not None, toploc_verification_fingerprints
+            )
+        else:
+            toploc_verification_fingerprints = None
+
+        toploc_verification_fingerprint_validation_result = ret_item["meta_info"].get(
+            "toploc_verification_fingerprint_validation_result", None
+        )
+        if not toploc_verification_fingerprint_validation_result:
+            toploc_verification_fingerprint_validation_result = None
+
         if to_file:
             # to make the choice data json serializable
             choice_data = {
@@ -1156,6 +1188,8 @@ def v1_chat_generate_response(
                     "content": text if text else None,
                     "tool_calls": tool_calls,
                     "reasoning_content": reasoning_text if reasoning_text else None,
+                    "toploc_verification_fingerprints": toploc_verification_fingerprints,
+                    "toploc_verification_fingerprint_validation_result": toploc_verification_fingerprint_validation_result,
                 },
                 "logprobs": choice_logprobs.model_dump() if choice_logprobs else None,
                 "finish_reason": (finish_reason["type"] if finish_reason else ""),
@@ -1173,6 +1207,8 @@ def v1_chat_generate_response(
                     content=text if text else None,
                     tool_calls=tool_calls,
                     reasoning_content=reasoning_text if reasoning_text else None,
+                    toploc_verification_fingerprints=toploc_verification_fingerprints,
+                    toploc_verification_fingerprint_validation_result=toploc_verification_fingerprint_validation_result,
                 ),
                 logprobs=choice_logprobs,
                 finish_reason=(finish_reason["type"] if finish_reason else ""),
@@ -1216,6 +1252,21 @@ def v1_chat_generate_response(
         )
         completion_tokens = sum(item["meta_info"]["completion_tokens"] for item in ret)
         cached_tokens = sum(item["meta_info"].get("cached_tokens", 0) for item in ret)
+        input_ids = None
+        output_ids = None
+
+        if ret and "origin_input_ids" in ret[0]["meta_info"]:
+            # Set input_ids from the origin_input_ids in meta_info
+            if hasattr(request, "return_input_ids") and request.return_input_ids:
+                input_ids = ret[0]["meta_info"]["origin_input_ids"]
+        else:
+            pass
+
+        if ret and "output_token_ids" in ret[0]["meta_info"]:
+            # Set output_ids from the output_token_ids in meta_info
+            if hasattr(request, "return_output_ids") and request.return_output_ids:
+                output_ids = ret[0]["meta_info"]["output_token_ids"]
+
         response = ChatCompletionResponse(
             id=ret[0]["meta_info"]["id"],
             model=request.model,
@@ -1228,6 +1279,8 @@ def v1_chat_generate_response(
                     {"cached_tokens": cached_tokens} if cache_report else None
                 ),
             ),
+            input_ids=input_ids,
+            output_ids=output_ids,  # Add output_ids to the response
         )
         return response
 

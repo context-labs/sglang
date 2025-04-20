@@ -348,6 +348,11 @@ class ChatCompletionRequest(BaseModel):
     separate_reasoning: bool = True
     stream_reasoning: bool = True
 
+    # Extra parameters for SRT backend only and will be ignored by OpenAI models.
+    toploc_verification_fingerprint_to_validate: Optional[str] = None
+    return_input_ids: bool = False
+    return_output_ids: bool = False
+
 
 class FunctionResponse(BaseModel):
     """Function response."""
@@ -369,6 +374,8 @@ class ChatMessage(BaseModel):
     content: Optional[str] = None
     reasoning_content: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = Field(default=None, examples=[None])
+    toploc_verification_fingerprints: Optional[List] = None
+    toploc_verification_fingerprint_validation_result: Optional[str] = None
 
 
 class ChatCompletionResponseChoice(BaseModel):
@@ -386,6 +393,8 @@ class ChatCompletionResponse(BaseModel):
     model: str
     choices: List[ChatCompletionResponseChoice]
     usage: UsageInfo
+    input_ids: Optional[List[int]] = None
+    output_ids: Optional[List[int]] = None
 
 
 class DeltaMessage(BaseModel):
@@ -393,6 +402,8 @@ class DeltaMessage(BaseModel):
     content: Optional[str] = None
     reasoning_content: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = Field(default=None, examples=[None])
+    toploc_verification_fingerprints: Optional[List] = None
+    toploc_verification_fingerprint_validation_result: Optional[str] = None
 
 
 class ChatCompletionResponseStreamChoice(BaseModel):

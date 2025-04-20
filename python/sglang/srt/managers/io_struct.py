@@ -73,6 +73,9 @@ class GenerateReqInput:
     # Session info for continual prompting
     session_params: Optional[Union[List[Dict], Dict]] = None
 
+    # TopLOC Verification fingerprints to validate against activations
+    toploc_verification_fingerprint_to_validate: Optional[Union[List[str], str]] = None
+
     # Custom logit processor for advanced sampling control. Must be a serialized instance
     # of `CustomLogitProcessor` in python/sglang/srt/sampling/custom_logit_processor.py
     # Use the processor's `to_str()` method to generate the serialized string.
@@ -248,6 +251,11 @@ class GenerateReqInput:
                 else None
             ),
             return_hidden_states=self.return_hidden_states,
+            toploc_verification_fingerprint_to_validate=(
+                self.toploc_verification_fingerprint_to_validate[i]
+                if self.toploc_verification_fingerprint_to_validate is not None
+                else None
+            ),
         )
 
 
@@ -289,6 +297,9 @@ class TokenizedGenerateReqInput:
 
     # Whether to return hidden states
     return_hidden_states: bool = False
+
+    # TopLOC Verification fingerprints to validate
+    toploc_verification_fingerprint_to_validate: Optional[str] = None
 
 
 @dataclass
@@ -425,8 +436,17 @@ class BatchTokenIDOut:
     output_token_ids_logprobs_val: List[List]
     output_token_ids_logprobs_idx: List[List]
 
+    # Input IDs / Output IDs
+    origin_input_ids: List[List[int]]
+    # The full sequence of output token IDs for each request
+    output_token_ids: List[List[int]]
+
     # Hidden states
     output_hidden_states: List[List[float]]
+
+    # TopLOC Verification fingerprints
+    toploc_verification_fingerprints: List[List]
+    toploc_verification_fingerprint_validation_results: List[Optional[str]] = None
 
 
 @dataclass
@@ -474,6 +494,15 @@ class BatchStrOut:
 
     # Hidden states
     output_hidden_states: List[List[float]]
+
+    # TopLOC Verification fingerprints
+    toploc_verification_fingerprints: List[List]
+    toploc_verification_fingerprint_validation_results: List[Optional[str]] = None
+
+    # Origin input ids (for return_input_ids=True)
+    origin_input_ids: Optional[List[List[int]]] = None
+    # Output token ids (for return_output_ids=True)
+    output_token_ids: Optional[List[List[int]]] = None
 
 
 @dataclass

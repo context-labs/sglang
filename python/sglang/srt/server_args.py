@@ -185,6 +185,9 @@ class ServerArgs:
     debug_tensor_dump_input_file: Optional[str] = None
     debug_tensor_dump_inject: bool = False
 
+    toploc_verification: bool = False
+    toploc_verification_topk: Optional[int] = 128
+
     def __post_init__(self):
         # Set missing default values
         if self.tokenizer_path is None:
@@ -1063,6 +1066,18 @@ class ServerArgs:
             help="Inject the outputs from jax as the input of every layer.",
         )
 
+        parser.add_argument(
+            "--toploc-verification",
+            action="store_true",
+            help="Enable features relating to toploc verification",
+        )
+        parser.add_argument(
+            "--toploc-verification-topk",
+            type=int,
+            default=128,
+            help="Top-k for TopLoc verification",
+        )
+
     @classmethod
     def from_cli_args(cls, args: argparse.Namespace):
         args.tp_size = args.tensor_parallel_size
@@ -1118,6 +1133,7 @@ def prepare_server_args(argv: List[str]) -> ServerArgs:
     parser = argparse.ArgumentParser()
     ServerArgs.add_cli_args(parser)
     raw_args = parser.parse_args(argv)
+    print(raw_args)
     server_args = ServerArgs.from_cli_args(raw_args)
     return server_args
 

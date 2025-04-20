@@ -75,6 +75,8 @@ global_server_args_dict = {
     "enable_flashmla": ServerArgs.enable_flashmla,
     "disable_radix_cache": ServerArgs.disable_radix_cache,
     "flashinfer_mla_disable_ragged": ServerArgs.flashinfer_mla_disable_ragged,
+    "toploc_verification_topk": ServerArgs.toploc_verification_topk,
+    "toploc_verification": ServerArgs.toploc_verification,
 }
 
 logger = logging.getLogger(__name__)
@@ -268,6 +270,7 @@ class Req:
         custom_logit_processor: Optional[str] = None,
         return_hidden_states: bool = False,
         eos_token_ids: Optional[Set[int]] = None,
+        toploc_verification_fingerprint_to_validate: Optional[str] = None,
     ):
         # Input and output info
         self.rid = rid
@@ -308,6 +311,16 @@ class Req:
         self.to_abort_message: str = "Unknown error"
         self.stream = stream
         self.eos_token_ids = eos_token_ids
+
+        # TopLOC generation (input)
+        self.toploc_verification_hidden_states = []
+        self.toploc_verification_fingerprints = []
+
+        # TopLOC verification (output)
+        self.toploc_verification_fingerprint_to_validate = (
+            toploc_verification_fingerprint_to_validate
+        )
+        self.toploc_verification_fingerprint_validation_result = None
 
         # For incremental decoding
         # ----- | --------- read_ids -------|
@@ -607,6 +620,9 @@ class ScheduleBatch:
     spec_algorithm: SpeculativeAlgorithm = None
     spec_info: Optional[Union[EagleDraftInput, EagleVerifyInput]] = None
 
+    # Verification
+    toploc_verification: bool = False
+
     # Enable custom logit processor
     enable_custom_logit_processor: bool = False
 
@@ -623,7 +639,8 @@ class ScheduleBatch:
         model_config: ModelConfig,
         enable_overlap: bool,
         spec_algorithm: SpeculativeAlgorithm,
-        enable_custom_logit_processor: bool,
+        toploc_verification: bool,
+        enable_custom_logit_processor: bool = False,
     ):
         return_logprob = any(req.return_logprob for req in reqs)
 
@@ -639,6 +656,7 @@ class ScheduleBatch:
             has_grammar=any(req.grammar for req in reqs),
             device=req_to_token_pool.device,
             spec_algorithm=spec_algorithm,
+            toploc_verification=toploc_verification,
             enable_custom_logit_processor=enable_custom_logit_processor,
             return_hidden_states=any(req.return_hidden_states for req in reqs),
         )
@@ -1313,6 +1331,25 @@ class ScheduleBatch:
 
         global bid
         bid += 1
+
+        capture_hidden_mode = (
+            CaptureHiddenMode.FULL
+            if self.return_hidden_states
+            else (
+                getattr(self.spec_info, "capture_hidden_mode", CaptureHiddenMode.NULL)
+                if self.spec_info
+                else CaptureHiddenMode.NULL
+            )
+        )
+
+        # Ensure CAPTURE_HIDDEN_MODE is *at least* LAST if toploc verification is enabled
+        if self.toploc_verification and capture_hidden_mode == CaptureHiddenMode.NULL:
+            capture_hidden_mode = CaptureHiddenMode.LAST
+
+        toploc_verification_fingerprints_to_validate = [
+            r.toploc_verification_fingerprint_to_validate for r in self.reqs
+        ]
+
         return ModelWorkerBatch(
             bid=bid,
             forward_mode=self.forward_mode,
@@ -1342,18 +1379,10 @@ class ScheduleBatch:
             input_embeds=self.input_embeds,
             spec_algorithm=self.spec_algorithm,
             spec_info=self.spec_info,
-            capture_hidden_mode=(
-                CaptureHiddenMode.FULL
-                if self.return_hidden_states
-                else (
-                    getattr(
-                        self.spec_info, "capture_hidden_mode", CaptureHiddenMode.NULL
-                    )
-                    if self.spec_info
-                    else CaptureHiddenMode.NULL
-                )
-            ),
+            toploc_verification=self.toploc_verification,
+            capture_hidden_mode=capture_hidden_mode,
             extend_input_logprob_token_ids=self.extend_input_logprob_token_ids,
+            toploc_verification_fingerprints_to_validate=toploc_verification_fingerprints_to_validate,
         )
 
     def copy(self):
@@ -1366,6 +1395,7 @@ class ScheduleBatch:
             return_logprob=self.return_logprob,
             decoding_reqs=self.decoding_reqs,
             spec_algorithm=self.spec_algorithm,
+            toploc_verification=self.toploc_verification,
             enable_custom_logit_processor=self.enable_custom_logit_processor,
         )
 
@@ -1435,8 +1465,11 @@ class ModelWorkerBatch:
     # Speculative decoding
     spec_algorithm: SpeculativeAlgorithm = None
     spec_info: Optional[Union[EagleVerifyInput, EagleDraftInput]] = None
+    toploc_verification: bool = False
     # If set, the output of the batch contains the hidden states of the run.
     capture_hidden_mode: CaptureHiddenMode = None
+    # TopLOC Verification fingerprints to validate
+    toploc_verification_fingerprints_to_validate: Optional[List[str]] = None
 
 
 @triton.jit

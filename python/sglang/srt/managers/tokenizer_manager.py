@@ -357,6 +357,7 @@ class TokenizerManager:
         # Tokenize
         input_embeds = None
         input_text = obj.text
+
         if obj.input_embeds is not None:
             if not self.server_args.disable_radix_cache:
                 raise ValueError(
@@ -436,6 +437,7 @@ class TokenizerManager:
                 session_params=session_params,
                 custom_logit_processor=obj.custom_logit_processor,
                 return_hidden_states=obj.return_hidden_states,
+                toploc_verification_fingerprint_to_validate=obj.toploc_verification_fingerprint_to_validate,
             )
         elif isinstance(obj, EmbeddingReqInput):
             tokenized_obj = TokenizedEmbeddingReqInput(
@@ -886,6 +888,10 @@ class TokenizerManager:
             BatchStrOut, BatchEmbeddingOut, BatchMultimodalOut, BatchTokenIDOut
         ],
     ):
+        # Check if recv_obj has origin_input_ids and output_token_ids
+        has_origin_input_ids = hasattr(recv_obj, "origin_input_ids")
+        has_output_token_ids = hasattr(recv_obj, "output_token_ids")
+
         for i, rid in enumerate(recv_obj.rids):
             state = self.rid_to_state.get(rid, None)
             if state is None:
@@ -897,6 +903,22 @@ class TokenizerManager:
                 "finish_reason": recv_obj.finished_reasons[i],
                 "prompt_tokens": recv_obj.prompt_tokens[i],
             }
+
+            # Add origin_input_ids to meta_info if available
+            if has_origin_input_ids and recv_obj.origin_input_ids is not None:
+                if (
+                    i < len(recv_obj.origin_input_ids)
+                    and recv_obj.origin_input_ids[i] is not None
+                ):
+                    meta_info["origin_input_ids"] = recv_obj.origin_input_ids[i]
+
+            # Add output_token_ids to meta_info if available
+            if has_output_token_ids and recv_obj.output_token_ids is not None:
+                if (
+                    i < len(recv_obj.output_token_ids)
+                    and recv_obj.output_token_ids[i] is not None
+                ):
+                    meta_info["output_token_ids"] = recv_obj.output_token_ids[i]
 
             if getattr(state.obj, "return_logprob", False):
                 self.convert_logprob_style(
@@ -918,6 +940,47 @@ class TokenizerManager:
 
             if getattr(recv_obj, "output_hidden_states", None):
                 meta_info["hidden_states"] = recv_obj.output_hidden_states[i]
+
+            # Add toploc verification fingerprints to meta_info if they exist
+            if getattr(recv_obj, "toploc_verification_fingerprints", None) is not None:
+                try:
+                    # Make sure toploc_verification_fingerprints is properly extracted and formatted
+                    if i < len(recv_obj.toploc_verification_fingerprints):
+                        fingerprints = recv_obj.toploc_verification_fingerprints[i]
+                        meta_info["toploc_verification_fingerprints"] = fingerprints
+                    else:
+                        logger.warning(
+                            f"toploc_verification_fingerprints index {i} out of range (len={len(recv_obj.toploc_verification_fingerprints)})"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Error processing toploc verification fingerprints: {e}"
+                    )
+
+            # Add toploc verification fingerprint validation results to meta_info if they exist
+            if (
+                getattr(
+                    recv_obj, "toploc_verification_fingerprint_validation_results", None
+                )
+                is not None
+            ):
+                try:
+                    # Make sure toploc_verification_fingerprint_validation_results is properly extracted and formatted
+                    if i < len(
+                        recv_obj.toploc_verification_fingerprint_validation_results
+                    ):
+                        validation_result = (
+                            recv_obj.toploc_verification_fingerprint_validation_results[
+                                i
+                            ]
+                        )
+                        meta_info[
+                            "toploc_verification_fingerprint_validation_result"
+                        ] = validation_result
+                except Exception as e:
+                    logger.error(
+                        f"Error processing toploc verification fingerprint validation results: {e}"
+                    )
 
             if isinstance(recv_obj, BatchStrOut):
                 out_dict = {

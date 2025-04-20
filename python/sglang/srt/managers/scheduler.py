@@ -162,6 +162,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
         self.spec_algorithm = SpeculativeAlgorithm.from_string(
             server_args.speculative_algorithm
         )
+        self.toploc_verification = server_args.toploc_verification
         self.gpu_id = gpu_id
         self.enable_hierarchical_cache = server_args.enable_hierarchical_cache
         self.page_size = server_args.page_size
@@ -667,6 +668,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 custom_logit_processor=custom_logit_processor,
                 return_hidden_states=recv_req.return_hidden_states,
                 eos_token_ids=self.model_config.hf_eos_token_id,
+                toploc_verification_fingerprint_to_validate=recv_req.toploc_verification_fingerprint_to_validate,
             )
             req.tokenizer = self.tokenizer
 
@@ -1135,6 +1137,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
             self.model_config,
             self.enable_overlap,
             self.spec_algorithm,
+            self.toploc_verification,
             self.server_args.enable_custom_logit_processor,
         )
         new_batch.prepare_for_extend()
@@ -1366,6 +1369,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
             self.model_config,
             self.enable_overlap,
             self.spec_algorithm,
+            self.toploc_verification,
             self.server_args.enable_custom_logit_processor,
         )
         idle_batch.prepare_for_idle()

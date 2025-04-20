@@ -29,6 +29,7 @@ from sglang.srt.distributed.parallel_state import GroupCoordinator, graph_captur
 from sglang.srt.layers.logits_processor import LogitsProcessorOutput
 from sglang.srt.layers.moe.fused_moe_native import fused_moe_forward_native
 from sglang.srt.layers.torchao_utils import save_gemlite_cache
+from sglang.srt.managers.schedule_batch import global_server_args_dict
 from sglang.srt.model_executor.forward_batch_info import (
     CaptureHiddenMode,
     ForwardBatch,
@@ -40,6 +41,10 @@ _is_hip = is_hip()
 
 if TYPE_CHECKING:
     from sglang.srt.model_executor.model_runner import ModelRunner
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _to_torch(model: torch.nn.Module, reverse: bool, num_tokens: int):
@@ -237,6 +242,12 @@ class CudaGraphRunner:
                     (self.max_num_token, self.model_runner.model_config.hidden_size),
                     dtype=self.model_runner.dtype,
                 )
+            # TopLOC verification
+            elif self.model_runner.server_args.toploc_verification:
+                self.hidden_states = torch.zeros(
+                    (self.max_num_token, self.model_runner.model_config.hidden_size),
+                    dtype=self.model_runner.dtype,
+                )
 
             if self.is_encoder_decoder:
                 # NOTE: encoder_lens can influence the full_text_row_masked_out_mask tensor when doing mixed batch
@@ -392,6 +403,13 @@ class CudaGraphRunner:
                 spec_info.capture_hidden_mode if spec_info else CaptureHiddenMode.NULL
             )
 
+        # During CUDA graph capture, ensure capture_hidden_mode is *at least* LAST if toploc verification is enabled
+        if (
+            self.capture_hidden_mode == CaptureHiddenMode.NULL
+            and self.model_runner.server_args.toploc_verification
+        ):
+            self.capture_hidden_mode = CaptureHiddenMode.LAST
+
         forward_batch = ForwardBatch(
             forward_mode=self.capture_forward_mode,
             batch_size=bs,
@@ -447,21 +465,29 @@ class CudaGraphRunner:
         return graph, out
 
     def recapture_if_needed(self, forward_batch: ForwardBatch):
+
         # If the capture_hidden_mode changes, we need to recapture the graph
         hidden_mode_from_spec_info = getattr(
             forward_batch.spec_info, "capture_hidden_mode", CaptureHiddenMode.NULL
         )
-        if (
-            forward_batch.capture_hidden_mode == CaptureHiddenMode.FULL
-            and self.capture_hidden_mode != CaptureHiddenMode.FULL
-        ):
-            self.capture_hidden_mode = CaptureHiddenMode.FULL
-            self.capture()
-        elif (
-            forward_batch.capture_hidden_mode != CaptureHiddenMode.FULL
-            and self.capture_hidden_mode != hidden_mode_from_spec_info
-        ):
-            self.capture_hidden_mode = hidden_mode_from_spec_info
+        capture_hidden_mode_priority = {
+            CaptureHiddenMode.NULL: 1,
+            CaptureHiddenMode.LAST: 2,
+            CaptureHiddenMode.FULL: 3,
+        }
+        max_priority_level = max(
+            capture_hidden_mode_priority[mode]
+            for mode in [forward_batch.capture_hidden_mode, hidden_mode_from_spec_info]
+        )
+        capture_hidden_mode_by_priority = {
+            v: k for k, v in capture_hidden_mode_priority.items()
+        }
+        highest_needed_capture_mode = capture_hidden_mode_by_priority[
+            max_priority_level
+        ]
+
+        if self.capture_hidden_mode != highest_needed_capture_mode:
+            self.capture_hidden_mode = highest_needed_capture_mode
             self.capture()
 
     def replay_prepare(self, forward_batch: ForwardBatch):
@@ -534,13 +560,15 @@ class CudaGraphRunner:
         self.graphs[self.bs].replay()
         next_token_logits, hidden_states = self.output_buffers[self.bs]
 
+        hidden_states = (
+            hidden_states[: self.raw_num_token] if hidden_states is not None else None
+        )
+
         logits_output = LogitsProcessorOutput(
             next_token_logits=next_token_logits[: self.raw_num_token],
-            hidden_states=(
-                hidden_states[: self.raw_num_token]
-                if hidden_states is not None
-                else None
-            ),
+            hidden_states=hidden_states,
+            # Because CUDA_GRAPH only runs in DECODE mode, every n in N for [N,hidden_dimension] is a "last token"
+            toploc_verification_hidden_states=hidden_states,
         )
         return logits_output
 

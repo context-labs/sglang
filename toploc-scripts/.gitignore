@@ -1,0 +1,12 @@
+.env
+ultrachat/**/**.*
+fingerprints/**/**.*
+verifications/**/**.*
+replications/**/**.*
+replications/**/**.*
+inferences_to_replicate/**/**.*
+*.png
+*.html
+classifier_analysis_results/
+response_logprobs/
+**/**.ipynb

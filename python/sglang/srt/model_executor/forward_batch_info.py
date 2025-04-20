@@ -217,11 +217,17 @@ class ForwardBatch:
     spec_algorithm: SpeculativeAlgorithm = None
     capture_hidden_mode: CaptureHiddenMode = None
 
+    # Verification algorithm
+    toploc_verification: bool = False
+
     # For padding
     padded_static_len: int = -1  # -1 if not padded
 
     # For Qwen2-VL
     mrope_positions: torch.Tensor = None
+
+    # Verification fingerprint to validate
+    toploc_verification_fingerprints_to_validate: Optional[List[str]] = None
 
     @classmethod
     def init_new(
@@ -262,6 +268,8 @@ class ForwardBatch:
             capture_hidden_mode=batch.capture_hidden_mode,
             input_embeds=batch.input_embeds,
             extend_input_logprob_token_ids_gpu=extend_input_logprob_token_ids_gpu,
+            toploc_verification=batch.toploc_verification,
+            toploc_verification_fingerprints_to_validate=batch.toploc_verification_fingerprints_to_validate,
         )
 
         # For DP attention
