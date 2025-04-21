@@ -267,6 +267,8 @@ class Req:
         self.session_id = session_id
         self.input_embeds = input_embeds
 
+        print("In Req constructor - temperature: ", sampling_params.temperature)
+
         # Sampling info
         if isinstance(sampling_params.custom_params, dict):
             sampling_params = copy.copy(sampling_params)

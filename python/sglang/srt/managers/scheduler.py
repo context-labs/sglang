@@ -631,6 +631,8 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 )
                 custom_logit_processor = None
 
+            print("In handle_generate_request - temperature: ", recv_req.sampling_params.temperature)
+
             req = Req(
                 recv_req.rid,
                 recv_req.input_text,

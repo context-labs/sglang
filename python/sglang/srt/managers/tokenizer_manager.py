@@ -408,10 +408,14 @@ class TokenizerManager:
                 f"messages or the completion to fit within the limit."
             )
 
+        print("In tokenizer_manager _tokenize_one_request (before normalize) - temperature: ", obj.sampling_params)
+
         # Parse sampling parameters
         sampling_params = SamplingParams(**obj.sampling_params)
         sampling_params.normalize(self.tokenizer)
         sampling_params.verify()
+
+        print("In tokenizer_manager _tokenize_one_request (after normalize) - temperature: ", sampling_params.temperature)
 
         # Build return object
         if isinstance(obj, GenerateReqInput):

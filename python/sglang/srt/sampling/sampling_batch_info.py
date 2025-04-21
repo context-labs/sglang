@@ -60,6 +60,10 @@ class SamplingBatchInfo:
     def from_schedule_batch(cls, batch: ScheduleBatch, vocab_size: int):
         reqs = batch.reqs
         device = batch.device
+        print("IN from_schedule_batch temperature: ", [r.sampling_params.temperature for r in reqs])
+        print("IN from_schedule_batch top_p: ", [r.sampling_params.top_p for r in reqs])
+        print("IN from_schedule_batch top_k: ", [r.sampling_params.top_k for r in reqs])
+        print("IN from_schedule_batch min_p: ", [r.sampling_params.min_p for r in reqs])
         temperatures = (
             torch.tensor(
                 [r.sampling_params.temperature for r in reqs],

@@ -157,6 +157,10 @@ class ForwardBatch:
     temperature: torch.Tensor = None
     top_p_normalized_logprobs: bool = False
     top_p: torch.Tensor = None
+    top_k_normalized_logprobs: bool = False
+    top_k: torch.Tensor = None
+    min_p_normalized_logprobs: bool = False
+    min_p: torch.Tensor = None
 
     # Position information
     positions: torch.Tensor = None
@@ -261,6 +265,14 @@ class ForwardBatch:
             capture_hidden_mode=batch.capture_hidden_mode,
             input_embeds=batch.input_embeds,
             extend_input_logprob_token_ids_gpu=extend_input_logprob_token_ids_gpu,
+            temp_scaled_logprobs=batch.sampling_info.temperatures is not None,
+            temperature=batch.sampling_info.temperatures,
+            top_p_normalized_logprobs=batch.sampling_info.top_ps is not None,
+            top_p=batch.sampling_info.top_ps,
+            top_k_normalized_logprobs=batch.sampling_info.top_ks is not None,
+            top_k=batch.sampling_info.top_ks,
+            min_p_normalized_logprobs=batch.sampling_info.min_ps is not None,
+            min_p=batch.sampling_info.min_ps,
         )
 
         # For DP attention
