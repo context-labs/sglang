@@ -254,6 +254,25 @@ def top_k_normalize_probs_torch(
     return torch.zeros_like(probs_sort).scatter_(-1, probs_idx, probs_sort)
 
 
+def top_p_top_k_normalize_probs_torch(
+    probs: torch.Tensor, # [T,V]
+    top_ps: torch.Tensor, # [T]
+    top_ks: torch.Tensor, # [T]
+    ):
+    probs_sort, probs_idx = probs.sort(dim=-1, descending=True)
+
+    # top_ps
+    probs_sum = torch.cumsum(probs_sort, dim=-1)
+    probs_sort[(probs_sum - probs_sort) > top_ps.view(-1, 1)] = 0.0
+
+    # top_ks
+    mask = torch.arange(0, probs.shape[-1], device=probs.device).view(1, -1) >= top_ks.view(-1, 1)
+    probs_sort[mask] = 0.0
+
+    probs_sort.div_(probs_sort.sum(dim=-1, keepdim=True))
+    return torch.zeros_like(probs_sort).scatter_(-1, probs_idx, probs_sort)
+    
+
 def get_top_logprobs(logprobs: torch.Tensor, top_logprobs_nums: List[int]):
     assert len(top_logprobs_nums) == logprobs.shape[0], (
         len(top_logprobs_nums),
