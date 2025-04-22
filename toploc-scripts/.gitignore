@@ -6,6 +6,8 @@ replications/**/**.*
 replications/**/**.*
 inferences_to_replicate/**/**.*
 inferences_to_replicate_temp_1/**/**.*
+inferences_to_replicate_temp_0_bak/**/**.*
+
 *.png
 *.html
 classifier_analysis_results/
