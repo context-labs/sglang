@@ -613,7 +613,7 @@ class LogitsProcessor(nn.Module):
         # Scale logits if temperature scaling is enabled
         if logits_metadata.temp_scaled_logprobs:
             print(f"Scaling logits by temperature: {logits_metadata.temperature}")
-            last_logits = last_logits / logits_metadata.temperature
+            last_logits = last_logits.div_(logits_metadata.temperature)
 
         # Normalize logprobs if top_p normalization is enabled
         # NOTE: only normalize logprobs when top_p is set and not equal to 1.0
