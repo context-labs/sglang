@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ../sglang-current/.venv/bin/activate
+source ../sglang-clean/.venv/bin/activate
 
 
 MACHINE=$1

@@ -5,6 +5,7 @@ verifications/**/**.*
 replications/**/**.*
 replications/**/**.*
 inferences_to_replicate/**/**.*
+inferences_to_replicate_temp_1/**/**.*
 *.png
 *.html
 classifier_analysis_results/

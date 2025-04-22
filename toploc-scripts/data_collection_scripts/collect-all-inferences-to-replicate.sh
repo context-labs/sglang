@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Check if machine name is provided
-if [ $# -ne 1 ]; then
-    echo "Usage: $0 <machine_name>"
+if [ $# -ne 1 ] && [ $# -ne 2 ]; then
+    echo "Usage: $0 <machine_name> [temperature]"
     exit 1
 fi
 
-source ../sglang-current/.venv/bin/activate
+source ../sglang-clean/.venv/bin/activate
 pip install dotenv
 pip install huggingface-hub
 pip install tabulate
@@ -17,6 +17,16 @@ if [ -z "$MACHINE" ]; then
     echo "Error: Machine name is empty"
     exit 1
 fi
+
+# Check if temperature is provided as second argument
+if [ $# -eq 2 ]; then
+    TEMPERATURE=$2
+else
+    TEMPERATURE=1.0
+fi
+
+echo "Using temperature: $TEMPERATURE"
+
 
 
 # Array of models to process
@@ -37,7 +47,7 @@ for MODEL in "${MODELS[@]}"; do
         echo "Output file already exists: ${OUTPUT_FILENAME}"
         continue
     fi
-    python toploc-scripts/data_collection_scripts/collect_inferences_to_replicate.py --N 100 --machine "$MACHINE" --model "$MODEL" --output_filename "${OUTPUT_FILENAME}" --disable-cuda-graph
+    python toploc-scripts/data_collection_scripts/collect_inferences_to_replicate.py --N 100 --machine "$MACHINE" --model "$MODEL" --temperature "$TEMPERATURE" --output_filename "${OUTPUT_FILENAME}" --disable-cuda-graph
 
     # Optional: add a small delay between runs
     sleep 2

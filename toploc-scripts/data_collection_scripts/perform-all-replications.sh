@@ -7,7 +7,7 @@ if [ $# -ne 1 ]; then
 fi
 
 
-source ../sglang-current/.venv/bin/activate
+source ../sglang-clean/.venv/bin/activate
 pip install dotenv
 pip install huggingface-hub
 pip install tabulate
