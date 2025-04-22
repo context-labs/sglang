@@ -7,6 +7,7 @@ replications/**/**.*
 inferences_to_replicate/**/**.*
 inferences_to_replicate_temp_1/**/**.*
 inferences_to_replicate_temp_0_bak/**/**.*
+inferences_to_replicate_temp_0/**/**.*
 
 *.png
 *.html
