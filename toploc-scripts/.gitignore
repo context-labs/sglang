@@ -10,3 +10,4 @@ inferences_to_replicate/**/**.*
 classifier_analysis_results/
 response_logprobs/
 **/**.ipynb
+**/cache.json

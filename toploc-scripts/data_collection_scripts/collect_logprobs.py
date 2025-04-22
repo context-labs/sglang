@@ -23,13 +23,12 @@ from sglang.srt.openai_api.adapter import v1_chat_generate_request
 from sglang.srt.openai_api.protocol import ChatCompletionRequest
 from sglang.srt.server_args import PortArgs, ServerArgs
 from sglang.utils import (
+    kill_process_tree,
     launch_server_cmd,
     print_highlight,
     terminate_process,
     wait_for_server,
 )
-
-DEBUGGING = True
 
 load_dotenv()
 
@@ -52,6 +51,7 @@ def parse_args():
     parser.add_argument("--disable-cuda-graph", action="store_true")
     parser.add_argument("--interactive", action="store_true")
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--debugging", action="store_true")
     parser.add_argument(
         "--N",
         type=int,
@@ -110,7 +110,8 @@ async def collect_logprobs(port, args):
             prompt_token_ids, prompt_response_token_ids
         ), "Prefix check failed"
 
-        # Let's get the top log-probs associated with the prompt+response prefill sequence
+        # Let's get the top 200 log-probs associated with the prompt+response prefill sequence
+        # (Getting the entire distribution via JSON is cost prohibitive - so we do this until we have a method to get directly from GPU)
         top_logprob_num = 200
         model, *_ = model.split(";")
         logprobs_request = make_logprobs_request(
@@ -119,8 +120,6 @@ async def collect_logprobs(port, args):
         ret = await get_top_logprobs_from_LLM(
             model, logprobs_request, prompt_response_token_ids, top_logprob_num
         )
-        with open("ret.json", "w") as f:
-            json.dump(ret, f, indent=2)
         M = gather_logprobs(ret, top_logprob_num)
 
         input_token_logprobs_from_ret = [
@@ -137,30 +136,85 @@ async def collect_logprobs(port, args):
             input_token_logprobs_from_ret[len(prompt_token_ids) :] == response_token_ids
         )
 
-        p_value, test_statistic, num_unlikely_tokens_detected = (
-            calculate_p_value_from_sparse_matrix(
-                M_response, response_token_ids, top_logprob_num
-            )
-        )
+        # Convert to probabilities
+        M_p = M_response.copy()
+        M_p.data = np.exp(M_p.data)
 
-        print(p_value, test_statistic, num_unlikely_tokens_detected)
+        # Apply after-the-fact top-p renormalization
+        top_k = 1 if prefill_request["temperature"] == 0 else prefill_request["top_k"]
+        if top_k is not None and top_k != -1:
+            M_p = apply_top_k_renormalization(M_p, top_k)
+            top_logprob_num = top_k
+
+        # Apply after-the-fact top-k renormalization
+        # top_p = prefill_request.top_p
+        # if top_p is not None and top_p != -1:
+        #    apply_top_p_renormalization(M_p, top_p)
+
+        statistics = collect_statistics_from_sparse_matrix(
+            M_p, response_token_ids, top_logprob_num
+        )
 
         # Store the logprobs for this inference
         logprobs_results = {
             "inference_id": i,
+            **statistics,
             "prompt": inference["complete_request"]["messages"],
             "response": inference["complete_response"]["choices"][0]["message"][
                 "content"
             ],
-            "p_value": float(p_value),
-            "test_statistic": float(test_statistic),
-            "num_unlikely_tokens_detected": int(num_unlikely_tokens_detected),
         }
 
         # Add to the collection
         all_logprobs_results.append(logprobs_results)
 
     return all_logprobs_results
+
+
+# Using a CSR matrix was, in retrospect, possibly a mistake?
+def apply_top_k_renormalization(M_p: csr_matrix, top_k: int):
+    assert isinstance(M_p, csr_matrix)
+    assert top_k > 0
+
+    # Create lists to hold the new data
+    new_data = []
+    new_indices = []
+    new_indptr = [0]
+
+    # Process each row
+    for i in range(M_p.shape[0]):
+        row_start = M_p.indptr[i]
+        row_end = M_p.indptr[i + 1]
+
+        # Get the values for this row
+        row_data = M_p.data[row_start:row_end]
+        row_indices = M_p.indices[row_start:row_end]
+
+        if len(row_data) > top_k:
+            # Find indices of elements in top-k
+            top_k_idx = np.argpartition(row_data, -top_k)[-top_k:]
+            # Keep only the top-k elements
+            keep_data = row_data[top_k_idx]
+            keep_indices = row_indices[top_k_idx]
+        else:
+            # If we have fewer than top_k elements, keep all
+            keep_data = row_data
+            keep_indices = row_indices
+
+        # renormalize (with a little bit of smoothing so that when p=1, we don't get infinite values)
+        epsilon = 1e-2  # This is almost completely adhoc
+        keep_data = keep_data / (np.sum(keep_data))
+        keep_data = keep_data * (1 - epsilon)
+
+        # Add kept elements to our new data
+        new_data.extend(keep_data)
+        new_indices.extend(keep_indices)
+        new_indptr.append(len(new_data))
+
+    # Create a new CSR matrix with only the kept elements
+    M_top_k = csr_matrix((new_data, new_indices, new_indptr), shape=M_p.shape)
+
+    return M_top_k
 
 
 async def get_top_logprobs_from_LLM(model, request, token_ids, top_logprob_num):
@@ -198,8 +252,6 @@ async def get_top_logprobs_from_LLM(model, request, token_ids, top_logprob_num):
 def gather_logprobs(ret, top_logprob_num):
 
     # Get the Top N logprobs for each token in the sequence into arrays of [T,N]
-
-    print("len input_top_logprobs[1:]", len(ret["meta_info"]["input_top_logprobs"][1:]))
 
     seq_logprobs, seq_token_ids = [], []
     for top_tokens in tqdm(
@@ -263,15 +315,10 @@ def calculate_p_value_from_dense_matrix(M: np.ndarray, token_ids):
     return p_value
 
 
-def calculate_p_value_from_sparse_matrix(M: csr_matrix, token_ids, top_logprob_num):
-    assert isinstance(M, csr_matrix)
-    T = M.shape[0]
-    VOCAB_DIM = M.shape[1]
-
-    # Transform the sparse matrix from log-probs to probs (but only on the defined entries)
-    M_p = M.copy()
-    M_p.data = np.exp(M_p.data)
+def collect_statistics_from_sparse_matrix(M_p: csr_matrix, token_ids, top_logprob_num):
     assert isinstance(M_p, csr_matrix)
+    T = M_p.shape[0]
+    VOCAB_DIM = M_p.shape[1]
 
     # Get the observed probabilities for each token id at each position in the token sequence
     # Annoyingly, scipy.sparse matrix indexing returns a np.matrix, not an ndarray
@@ -283,10 +330,11 @@ def calculate_p_value_from_sparse_matrix(M: csr_matrix, token_ids, top_logprob_n
     assert P_obs.shape == (T,), f"{P_obs.shape} != ({T},)"
 
     # P_obs will be zero if the token is not in the top_logprob_num (let's just say 200)
-    # So, we have to substitute P_obs at those indices with a reasonable value
-    # 1. Calculate the remaining probability mass after the top 200 tokens
+    # So, we have to substitute P_obs at those indices with a reasonable value.
+    # This takes a few steps.
+
+    # 1. Calculate the remaining probability mass after the top, say, 200 tokens
     unlikely_tokens_total_mass = 1.0 - M_p.sum(axis=1)
-    print(type(unlikely_tokens_total_mass), unlikely_tokens_total_mass.shape)
     if isinstance(unlikely_tokens_total_mass, np.matrix):
         unlikely_tokens_total_mass = unlikely_tokens_total_mass.A1
     unlikely_tokens_total_mass = unlikely_tokens_total_mass.ravel()
@@ -339,25 +387,22 @@ def calculate_p_value_from_sparse_matrix(M: csr_matrix, token_ids, top_logprob_n
     # Ok, now we have an accurate tail_mass for top-200 tokens, and plausible (but randomized) for non-top-200 tokens
     # Now we can proceed normally.
 
-    # Mid-rank correction
-    # U = tail_mass - 0.5 * P_obs
-
     # Uniform distribution correction
     U = tail_mass - P_obs * (np.random.rand(len(P_obs)))
 
-    # Spot-check - should give test statistic around 2*T-2
+    # Spot-check - should give test statistic around 2*T-2 - confirmed!
     # U = np.random.rand(len(P_obs))
 
     # Clipping for safety
     np.clip(U, 1e-323, 1.0, out=U)
     # Test statistic
     F = -2.0 * np.log(U).sum()
-    # p-value
-    p_value = chi2.sf(F, df=2 * T)
+    # p-value (do a two-tailed test - it's also suspicious if the selected tokens are much more "argmaxey" than expected)
+    # (TODO: what if an attacker mixes "argmaxey" behavior with unexpected tokens to push the F statistic closer to the null hypothesis?)
+    uncorrected_p_value = chi2.sf(F, df=2 * T)
+    p_value = min(uncorrected_p_value, 1 - uncorrected_p_value)
 
-    chi2(df=2 * T).mean()
-
-    if DEBUGGING:
+    if is_debugging():
         for i in range(T):
             print(
                 f"""Token {i}:
@@ -373,10 +418,23 @@ def calculate_p_value_from_sparse_matrix(M: csr_matrix, token_ids, top_logprob_n
             )
 
         print(f"F = {F:.4f}")
+        print(f"One-tailed p-value = {uncorrected_p_value:.4f}")
+        print(f"p-value = {p_value:.4f}")
         print(f"chi2 mode: {2*T - 2}")
         print(f"chi2 stdev: {(2 * 2*T)**0.5:.4f}")
 
-    return p_value, F, num_unlikely_tokens_detected
+    return {
+        "p_value": float(p_value),
+        "uncorrected_p_value": float(uncorrected_p_value),
+        "F": float(F),
+        "chi_squared_mode": int(2 * T - 2),
+        "chi_squared_stdev": float((2 * 2 * T) ** 0.5),
+        "num_unlikely_tokens": int(num_unlikely_tokens),
+        "average_token_rank": float(np.mean(token_ranks)),
+        "median_token_rank": float(np.median(token_ranks)),
+        "token_ranks": [int(rank) for rank in token_ranks],
+        "P_obs": P_obs.tolist(),
+    }
 
 
 def is_prefix(prefix_ids, ids):
@@ -391,7 +449,7 @@ def write_to_file(args, logprobs):
     os.makedirs(os.path.join(ROOT_DIR, "response_logprobs"), exist_ok=True)
     output_filepath = os.path.join(ROOT_DIR, "response_logprobs", output_filename)
     with open(output_filepath, "w") as f:
-        json.dump(logprobs, f)
+        json.dump(logprobs, f, indent=2)
 
 
 def make_prompt_request(inference, model):
@@ -410,7 +468,7 @@ def make_prompt_request(inference, model):
     return prefill_request
 
 
-def make_prefill_request(inference, model):
+def make_prefill_request(inference, model) -> ChatCompletionRequest:
     original_messages = inference["complete_request"]["messages"]
     original_response = inference["complete_response"]["choices"][0]["message"][
         "content"
@@ -484,8 +542,6 @@ def get_logprobs(client, model, request):
         response_dict = (
             response.model_dump() if hasattr(response, "model_dump") else response
         )
-
-        print(json.dumps(response_dict, indent=2))
 
         # Extract token distributions from the response
         token_distributions = []
@@ -564,15 +620,6 @@ def launch_engine(args):
     _global_state["scheduler_info"] = scheduler_info
 
 
-def shut_down_engine():
-    tokenizer_manager = _global_state["tokenizer_manager"]
-    scheduler_info = _global_state["scheduler_info"]
-    _global_state["tokenizer_manager"] = None
-    _global_state["scheduler_info"] = None
-    tokenizer_manager.shutdown()
-    scheduler_info.shutdown()
-
-
 def get_server_args(args):
     # other things to consider in future: grammar backend, etc.
     model, *quantization = args.model.split(";")
@@ -585,9 +632,31 @@ def get_server_args(args):
     }
 
 
+def shut_down_engine():
+    tokenizer_manager = _global_state["tokenizer_manager"]
+    scheduler_info = _global_state["scheduler_info"]
+    _global_state["tokenizer_manager"] = None
+    _global_state["scheduler_info"] = None
+    try:
+        kill_process_tree(os.getpid(), include_parent=False)
+    except:
+        pass
+
+
+def is_debugging():
+    return _global_state.get("debugging", False)
+
+
+def set_debugging():
+    _global_state["debugging"] = True
+
+
 async def main():
 
     args = parse_args()
+
+    if args.debugging:
+        set_debugging()
 
     # Dump the args
     print(args)
@@ -603,8 +672,11 @@ async def main():
     write_to_file(args, logprobs)
 
     print("Finished!")
+
     return
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+    shut_down_engine()
+    sys.exit(0)

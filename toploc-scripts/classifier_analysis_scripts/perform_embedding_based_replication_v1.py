@@ -1,13 +1,19 @@
 import argparse
+import hashlib
 import json
 import os
+import time
 from typing import Any, Dict, List
 
 import numpy as np
+import openai
 import pandas as pd
 import seaborn as sns
 import torch
 import torch.nn as nn
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 from matplotlib import pyplot as plt
 from sentence_transformers import CrossEncoder, SentenceTransformer
 
@@ -23,6 +29,12 @@ from sklearn.metrics import (
 from tabulate import tabulate
 from tqdm import tqdm
 
+load_dotenv()
+
+BATCH_SIZE = 5
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(SCRIPT_DIR)
 OUTPUT_DIR = os.path.abspath(
@@ -37,33 +49,83 @@ def parse_args():
     return parser.parse_args()
 
 
-def compute_scores(N, sim_callback, data, df):
+def hashlib_hash(args):
+    return hashlib.sha256(str(args).encode()).hexdigest()
+
+
+def compute_scores(N, sim_callback, batch_sim_callback, data, df):
     N = N or len(data)
-    for item in tqdm(data[:N]):
+    if batch_sim_callback is not None:
+        truncated_data = data[:N]
+        batch = []
+        for i, item in enumerate(tqdm(truncated_data)):
+            if len(batch) < BATCH_SIZE:
+                batch.append(item)
+            if len(batch) == BATCH_SIZE or i == len(truncated_data) - 1:
+                orig_responses = [
+                    item["original_response"]["choices"][0]["message"]["content"]
+                    for item in batch
+                ]
+                repl_responses = [
+                    item["replication_response"]["choices"][0]["message"]["content"]
+                    for item in batch
+                ]
+                similarities = batch_sim_callback(orig_responses, repl_responses)
+                for j, similarity in enumerate(similarities):
+                    df.append(
+                        {
+                            "prompt": batch[j]["prompt"],
+                            "original_response": orig_responses[j],
+                            "replication_response": repl_responses[j],
+                            "similarity": similarity,
+                            "genuine": batch[j]["original_request"]["model"]
+                            == batch[j]["replication_request"]["model"],
+                            "label": (
+                                "Genuine"
+                                if batch[j]["original_request"]["model"]
+                                == batch[j]["replication_request"]["model"]
+                                else "Spoof"
+                            ),
+                            "inference_machine": batch[j]["inference_machine"],
+                            "replication_machine": batch[j]["replication_machine"],
+                            "original_model": batch[j]["original_request"]["model"],
+                            "replication_model": batch[j]["replication_request"][
+                                "model"
+                            ],
+                        }
+                    )
+                batch = []
 
-        orig_model = item["original_request"]["model"]
-        repl_model = item["replication_request"]["model"]
+    else:
+        for item in tqdm(data[:N]):
 
-        orig_response = item["original_response"]["choices"][0]["message"]["content"]
+            orig_model = item["original_request"]["model"]
+            repl_model = item["replication_request"]["model"]
 
-        repl_response = item["replication_response"]["choices"][0]["message"]["content"]
+            orig_response = item["original_response"]["choices"][0]["message"][
+                "content"
+            ]
 
-        similarity = sim_callback(orig_response, repl_response)
+            repl_response = item["replication_response"]["choices"][0]["message"][
+                "content"
+            ]
 
-        df.append(
-            {
-                "prompt": item["prompt"],
-                "original_response": orig_response,
-                "replication_response": repl_response,
-                "similarity": similarity,
-                "genuine": orig_model == repl_model,
-                "label": "Genuine" if orig_model == repl_model else "Spoof",
-                "inference_machine": item["inference_machine"],
-                "replication_machine": item["replication_machine"],
-                "original_model": orig_model,
-                "replication_model": repl_model,
-            }
-        )
+            similarity = sim_callback(orig_response, repl_response)
+
+            df.append(
+                {
+                    "prompt": item["prompt"],
+                    "original_response": orig_response,
+                    "replication_response": repl_response,
+                    "similarity": similarity,
+                    "genuine": orig_model == repl_model,
+                    "label": "Genuine" if orig_model == repl_model else "Spoof",
+                    "inference_machine": item["inference_machine"],
+                    "replication_machine": item["replication_machine"],
+                    "original_model": orig_model,
+                    "replication_model": repl_model,
+                }
+            )
 
 
 def cosine_similarity_callback(model):
@@ -102,6 +164,164 @@ def dot_similarity_callback(model):
     return callback
 
 
+def nomic_cosine_similarity_callback(model, kind1, kind2):
+    def callback(orig_response, repl_response):
+        orig_embedding = model.encode([orig_response], prompt_name=kind1)
+        repl_embedding = model.encode([repl_response], prompt_name=kind2)
+        similarity = model.similarity(orig_embedding[0], repl_embedding[0])
+        similarity = similarity.numpy()
+        return float(similarity[0][0])
+
+    return callback
+
+
+CLIENTS = {}
+CACHE = {}
+
+
+def dump_cache():
+    with open("cache.json", "w") as f:
+        json.dump(CACHE, f)
+
+
+def load_cache():
+    global CACHE
+    if os.path.exists("cache.json"):
+        with open("cache.json", "r") as f:
+            CACHE = json.load(f)
+
+
+def gemini_batch_similarity_callback(model):
+    def callback(orig_responses, repl_responses):
+        if "gemini" not in CLIENTS:
+            CLIENTS["gemini"] = genai.Client(api_key=GEMINI_API_KEY)
+        client = CLIENTS["gemini"]
+
+        cached_orig_responses, cached_repl_responses = [], []
+        non_cached_orig_responses, non_cached_repl_responses = [], []
+
+        for orig_response, repl_response in zip(orig_responses, repl_responses):
+            key = hashlib_hash(("gemini", model, orig_response, repl_response))
+            if key not in CACHE:
+                non_cached_orig_responses.append(orig_response)
+                non_cached_repl_responses.append(repl_response)
+            else:
+                cached_orig_responses.append(orig_response)
+                cached_repl_responses.append(repl_response)
+
+        if len(non_cached_orig_responses) == 0:
+            embeddings = []
+        else:
+            print("Invoking API with batch of ", len(non_cached_orig_responses))
+            embeddings = client.models.embed_content(
+                model=model,
+                contents=non_cached_orig_responses + non_cached_repl_responses,
+                config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY"),
+            ).embeddings
+            embeddings = [r.values for r in embeddings]
+
+        print("len(embeddings)", len(embeddings))
+
+        sims = []
+        for i in range(len(non_cached_orig_responses)):
+            sim = pairwise_cos_sim(
+                [embeddings[i]], [embeddings[i + len(non_cached_orig_responses)]]
+            )
+            sim = float(sim[0])
+            sims.append(sim)
+            key = hashlib_hash(
+                (
+                    "gemini",
+                    model,
+                    non_cached_orig_responses[i],
+                    non_cached_repl_responses[i],
+                )
+            )
+
+            CACHE[key] = sim
+        for i in range(len(cached_orig_responses)):
+            key = hashlib_hash(
+                ("gemini", model, cached_orig_responses[i], cached_repl_responses[i])
+            )
+            sims.append(CACHE[key])
+
+        if len(non_cached_orig_responses) > 0:
+            time.sleep(20)
+
+        dump_cache()
+
+        return sims
+
+    return callback
+
+
+def gemini_similarity_callback(model):
+    def callback(orig_response, repl_response):
+        if "gemini" not in CLIENTS:
+            CLIENTS["gemini"] = genai.Client(api_key=GEMINI_API_KEY)
+        client = CLIENTS["gemini"]
+
+        embeddings = client.models.embed_content(
+            model=model,
+            contents=[orig_response, repl_response],
+            config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY"),
+        ).embeddings
+
+        emb1, emb2 = ([r.values] for r in embeddings)  # each r is types.Embedding
+
+        key = hashlib_hash(("gemini", model, orig_response, repl_response))
+
+        if key not in CACHE:
+            CACHE[key] = [emb1, emb2]
+        else:
+            emb1, emb2 = CACHE[key]
+
+        emb1, emb2 = np.asarray(emb1, dtype=float), np.asarray(emb2, dtype=float)
+
+        print("emb1", emb1)
+        print("emb2", emb2)
+        similarity = pairwise_cos_sim(emb1, emb2)
+        similarity = similarity.numpy()
+        assert np.prod(similarity.shape) == 1
+        return float(similarity[0])
+
+    return callback
+
+
+def openai_similarity_callback(model):
+    if "openai" not in CLIENTS:
+        CLIENTS["openai"] = openai.Client(api_key=OPENAI_API_KEY)
+
+    def callback(orig_response, repl_response):
+        client = CLIENTS["openai"]
+        key = hashlib_hash(("openai", model, orig_response, repl_response))
+        if key in CACHE:
+            return CACHE[key]
+        embeddings = client.embeddings.create(
+            input=[orig_response, repl_response], model=model
+        )
+        emb1_data, emb2_data = embeddings.data
+        emb1 = np.asarray([emb1_data.embedding], dtype=float)
+        emb2 = np.asarray([emb2_data.embedding], dtype=float)
+        similarity = pairwise_cos_sim(emb1, emb2)
+        similarity = similarity.numpy()
+        assert np.prod(similarity.shape) == 1
+        similarity_val = float(similarity[0])
+        if key not in CACHE:
+            CACHE[key] = similarity_val
+        return similarity_val
+
+    return callback
+
+
+def make_batch_sim_callback(sim_method: str):
+    family, model = sim_method.split("/")
+    if family == "gemini":
+        return gemini_batch_similarity_callback(model)
+    else:
+        return None
+
+
 def make_sim_callback(sim_method: str):
     family, model = sim_method.split("/")
     if family == "cosine":
@@ -113,6 +333,14 @@ def make_sim_callback(sim_method: str):
     elif family == "dot":
         model = SentenceTransformer(f"sentence-transformers/{model}")
         return dot_similarity_callback(model)
+    elif family == "nomic-ai":
+        kind1, kind2, model_name = model.split(";")
+        model = SentenceTransformer(f"nomic-ai/{model_name}", trust_remote_code=True)
+        return nomic_cosine_similarity_callback(model, kind1, kind2)
+    elif family == "gemini":
+        return gemini_similarity_callback(model)
+    elif family == "openai":
+        return openai_similarity_callback(model)
     else:
         raise ValueError(f"Invalid sim_method: {sim_method}")
 
@@ -314,6 +542,7 @@ def create_data_subsets(df):
 def main():
     args = parse_args()
     sim_callback = make_sim_callback(args.sim_method)
+    batch_sim_callback = make_batch_sim_callback(args.sim_method)
 
     df = []
     filenames = get_filenames()
@@ -321,7 +550,7 @@ def main():
         filepath = os.path.join(ROOT_DIR, "replications", filename)
         with open(filepath, "r") as f:
             data = json.load(f)
-        compute_scores(args, sim_callback, data, df)
+        compute_scores(args, sim_callback, batch_sim_callback, data, df)
     df = pd.DataFrame(df)
     data_subsets = create_data_subsets(df)
     for name, df in data_subsets.items():

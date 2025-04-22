@@ -34,13 +34,26 @@ for inference_filepath in toploc-scripts/inferences_to_replicate/*.inference; do
 
         echo "Processing model: $MODEL"
 
-        python toploc-scripts/data_collection_scripts/collect_logprobs.py --N 1 --interactive --machine "$MACHINE" --model "$MODEL" --input-file "$filename" --output-file "$OUTPUT_FILENAME" --disable-cuda-graph
+        cmd="python toploc-scripts/data_collection_scripts/collect_logprobs.py --N 1 --machine \"$MACHINE\" --model \"$MODEL\" --input-file \"$filename\" --output-file \"$OUTPUT_FILENAME\" --disable-cuda-graph --debugging"
+        # Add command to array for later printing
+        commands+=("$cmd")
 
-        exit 0
+
+        echo "Running: $cmd"
+        eval "$cmd"
 
         # Optional: add a small delay between runs
         sleep 2
 
+        break
+
     done
 
+    break
+
+done
+
+# Print all commands
+for cmd in "${commands[@]}"; do
+    echo "$cmd"
 done
