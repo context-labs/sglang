@@ -144,16 +144,6 @@ class LogitsMetadata:
                 extend_token_ids_logprob
             ) = extend_logprob_pruned_lens_cpu = False
 
-        print(f"In from_forward_batch: {forward_batch}")
-        print(f"temp_scaled_logprobs: {forward_batch.temp_scaled_logprobs}")
-        print(f"temperature: {forward_batch.temperature}")
-        print(f"top_p: {forward_batch.top_p}")
-        print(f"top_p_normalized_logprobs: {forward_batch.top_p_normalized_logprobs}")
-        print(f"top_k: {forward_batch.top_k}")
-        print(f"top_k_normalized_logprobs: {forward_batch.top_k_normalized_logprobs}")
-        print(f"min_p: {forward_batch.min_p}")
-        print(f"min_p_normalized_logprobs: {forward_batch.min_p_normalized_logprobs}")
-
         return cls(
             forward_mode=forward_batch.forward_mode,
             capture_hidden_mode=forward_batch.capture_hidden_mode,
@@ -394,9 +384,7 @@ class LogitsProcessor(nn.Module):
             # Note: this is how many "k" we want to return, not the top_k for sampling purposes
             if logits_metadata.extend_return_top_logprob:
                 # Clamp to avoid -inf, which certainly happens if we use top-p or top-k
-                print("Before clamp", input_logprobs[0,:20])
                 input_logprobs = input_logprobs.clamp(min=torch.finfo(input_logprobs.dtype).min)
-                print("After clamp", input_logprobs[0,:20])
 
                 (
                     input_top_logprobs_val,
@@ -543,23 +531,13 @@ class LogitsProcessor(nn.Module):
         # Note: We should also incorporate custom logit processors and/or grammar backend masks as well
         
         if logits_metadata.temp_scaled_logprobs:
-            print("Before temp scaling", last_logits[0,:20])
-            print(f"Scaling logits by temperature: {logits_metadata.temperature}")
-            #last_logits = last_logits / logits_metadata.temperature
             last_logits.div_(logits_metadata.temperature)
-            print("After temp scaling", last_logits[0,:20])
 
         needs_top_p = logits_metadata.top_p_normalized_logprobs \
             and (logits_metadata.top_p != 1.0).any()
 
         needs_top_k = logits_metadata.top_k_normalized_logprobs \
             and ((logits_metadata.top_k != -1) & (logits_metadata.top_k < last_logits.shape[-1])).any()
-
-
-        print("in compute_temp_top_p_top_k_normalized_logprobs")
-        print(f"needs_top_p: {needs_top_p}")
-        print(f"needs_top_k: {needs_top_k}")
-        print(f"last_logits.shape[-1]: {last_logits.shape[-1]}")
 
         if not needs_top_p and not needs_top_k:
             return torch.nn.functional.log_softmax(last_logits, dim=-1)
@@ -579,10 +557,8 @@ class LogitsProcessor(nn.Module):
 
         
         if needs_top_p:
-            print("   Applying top p")
             from sglang.srt.layers.sampler import top_p_normalize_probs_torch
             probs = top_p_normalize_probs_torch(probs, logits_metadata.top_p)
-            print(f"After top p: {probs[0,:20]}")
         """
         if needs_top_k:
             print("   Applying top k")
@@ -604,15 +580,8 @@ class LogitsProcessor(nn.Module):
             torch.Tensor: logprobs from logits
         """
 
-        print(f"In compute_temp_top_p_normalized_logprobs: {logits_metadata.temp_scaled_logprobs}")
-        print(f"temp_scaled_logprobs: {logits_metadata.temp_scaled_logprobs}")
-        print(f"temperature: {logits_metadata.temperature}")
-        print(f"top_p_normalized_logprobs: {logits_metadata.top_p_normalized_logprobs}")
-        print(f"top_p: {logits_metadata.top_p}")
-
         # Scale logits if temperature scaling is enabled
         if logits_metadata.temp_scaled_logprobs:
-            print(f"Scaling logits by temperature: {logits_metadata.temperature}")
             last_logits = last_logits.div_(logits_metadata.temperature)
 
         # Normalize logprobs if top_p normalization is enabled
@@ -622,8 +591,6 @@ class LogitsProcessor(nn.Module):
             and (logits_metadata.top_p != 1.0).any()
         ):
             from sglang.srt.layers.sampler import top_p_normalize_probs_torch
-
-            print(f"!!!! Normalizing logprobs by top_p: {logits_metadata.top_p}")
             probs = torch.softmax(last_logits, dim=-1)
             del last_logits
             probs = top_p_normalize_probs_torch(probs, logits_metadata.top_p)
