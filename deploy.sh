@@ -8,21 +8,17 @@ echo "Starting deployment process..."
 # Define source and destination paths
 SOURCE_DIR="$(pwd)"
 TARGET_DIR="$(pwd)/../kuzco-custom-worker/apps/cli"
-PROXY_SERVERS_DIR="${TARGET_DIR}/src/lib/proxy-servers"
+PATCHES_DIR="${TARGET_DIR}/src/lib/patches"
 
 # Ensure target directory exists
-mkdir -p "${PROXY_SERVERS_DIR}"
-
-# Copy sglang-launch-proxy-server.sh to target location
-echo "Copying sglang-launch-proxy-server.sh to ${PROXY_SERVERS_DIR}/sglang-launch-proxy-server.sh"
-cp "${SOURCE_DIR}/sglang-launch-proxy-server.sh" "${PROXY_SERVERS_DIR}/sglang-launch-proxy-server.sh"
+mkdir -p "${PATCHES_DIR}"
 
 # Copy sglang-proxy-server.py to target location
-echo "Copying sglang-proxy-server.py to ${PROXY_SERVERS_DIR}/sglang-proxy-server.py"
-cp "${SOURCE_DIR}/sglang-proxy-server.py" "${PROXY_SERVERS_DIR}/sglang-proxy-server.py"
+echo "Copying sglang-patched-server.py to ${PATCHES_DIR}/sglang-patched-server.py"
+cp "${SOURCE_DIR}/sglang-patched-server.py" "${PATCHES_DIR}/sglang-patched-server.py"
 
 # Verify files were copied successfully
-if [ -f "${PROXY_SERVERS_DIR}/sglang-launch-proxy-server.sh" ] && [ -f "${PROXY_SERVERS_DIR}/sglang-proxy-server.py" ]; then
+if [ -f "${PATCHES_DIR}/sglang-patched-server.py" ]; then
     echo "Files copied successfully!"
 else
     echo "Error: Failed to copy files."
